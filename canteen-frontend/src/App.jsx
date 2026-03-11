@@ -13,6 +13,8 @@ import POSInterface from './Components/Orders/POSInterface';
 import OrderQueue from './Components/Orders/OrderQueue';
 import InventoryTable from './Components/Inventory/InventoryTable';
 import UserManagement from './Components/user/UserManagement';
+import BrowseMenu from './Components/customer/BrowseMenu';
+import MyOrders from './Components/customer/MyOrders';
 
 // Lazy-loaded or simple page wrappers
 function ReportsPage() {
@@ -73,6 +75,8 @@ export default function App() {
                   <AppLayout />
                 </ProtectedRoute>
               }>
+                <Route path="/menu" element={<BrowseMenu />} />
+                <Route path="/my-orders" element={<MyOrders />} />
                 <Route path="/menu" element={
                   <div style={{ padding: 20, color: 'var(--text-muted)' }}>
                     Customer menu browsing page (uses same MenuList with no admin actions)
