@@ -72,4 +72,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:admin')->group(function () {
         Route::post('/inventory/{menuItem}/adjust', [InventoryController::class, 'adjust']);
     });
+    // User Management - Admin only
+Route::get('/users', [\App\Http\Controllers\UserController::class, 'index']);
+Route::post('/users', [\App\Http\Controllers\UserController::class, 'store']);
+Route::put('/users/{user}', [\App\Http\Controllers\UserController::class, 'update']);
+Route::delete('/users/{user}', [\App\Http\Controllers\UserController::class, 'destroy']);
+Route::patch('/users/{user}/toggle-active', [\App\Http\Controllers\UserController::class, 'toggleActive']);
 });

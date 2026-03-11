@@ -57,19 +57,58 @@ export default function Login() {
 
   return (
     <div className={styles.loginPage}>
+
+      {/* Background */}
       <div className={styles.background}>
+        <div className={styles.grid} />
         <div className={styles.orb1} />
         <div className={styles.orb2} />
-        <div className={styles.grid} />
       </div>
 
-      <div className={styles.container}>
-        <div className={styles.brand}>
-          <div className={styles.logo}>🍽️</div>
-          <h1 className={styles.brandName}>CanteenPro</h1>
-          <p className={styles.brandTagline}>Smart Canteen Management</p>
+      {/* Left Panel */}
+      <div className={styles.leftPanel}>
+        <div className={styles.brandRow}>
+          <div className={styles.logoBox}>🍽️</div>
+          <span className={styles.brandName}>Inventopia</span>
         </div>
 
+        <div className={styles.heroText}>
+          <h1>
+            Manage your canteen<br />
+            <span className={styles.highlight}>in one place.</span>
+          </h1>
+          <p className={styles.heroSub}>
+            Your all-in-one system for menu management, orders,
+            inventory, and sales reports — built for school canteens.
+          </p>
+        </div>
+
+        <div className={styles.featureList}>
+          <div className={styles.featureItem}>
+            <div className={styles.featureIcon}>📊</div>
+            <span>Real-time Sales Analytics</span>
+          </div>
+          <div className={styles.featureItem}>
+            <div className={styles.featureIcon}>💳</div>
+            <span>Point of Sale Interface</span>
+          </div>
+          <div className={styles.featureItem}>
+            <div className={styles.featureIcon}>📦</div>
+            <span>Inventory Tracking</span>
+          </div>
+          <div className={styles.featureItem}>
+            <div className={styles.featureIcon}>👥</div>
+            <span>Role-based Access Control</span>
+          </div>
+        </div>
+
+        <div className={styles.trusted}>
+          Trusted by canteen staff everywhere
+        </div>
+      </div>
+
+      {/* Right Panel - Login Card */}
+      <div className={styles.rightPanel}>
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <h2>Welcome back</h2>
@@ -138,6 +177,7 @@ export default function Login() {
           </div>
         </div>
       </div>
+
     </div>
   );
 }

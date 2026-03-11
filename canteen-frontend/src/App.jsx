@@ -12,6 +12,7 @@ import MenuList from './Components/Menu/MenuList';
 import POSInterface from './Components/Orders/POSInterface';
 import OrderQueue from './Components/Orders/OrderQueue';
 import InventoryTable from './Components/Inventory/InventoryTable';
+import UserManagement from './Components/user/UserManagement';
 
 // Lazy-loaded or simple page wrappers
 function ReportsPage() {
@@ -52,6 +53,7 @@ export default function App() {
                 <Route path="/admin/orders" element={<OrderQueue />} />
                 <Route path="/admin/inventory" element={<InventoryTable />} />
                 <Route path="/admin/reports" element={<AdminDashboard />} />
+                <Route path="/admin/users" element={<UserManagement />} />
               </Route>
 
               {/* Protected - Cashier */}

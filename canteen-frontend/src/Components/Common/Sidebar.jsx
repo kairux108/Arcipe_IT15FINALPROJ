@@ -42,8 +42,8 @@ export default function Sidebar({ isOpen, onClose }) {
         <div className={styles.brand}>
           <span className={styles.brandIcon}>🍽️</span>
           <div>
-            <div className={styles.brandName}>CanteenPro</div>
-            <div className={styles.brandSub}>Management System</div>
+            <div className={styles.brandName}>Inventopia</div>
+            <div className={styles.brandSub}>Canteen Management System</div>
           </div>
         </div>
 
