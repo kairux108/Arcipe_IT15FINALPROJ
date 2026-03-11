@@ -11,50 +11,57 @@ use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
-    public function salesSummary(Request $request): JsonResponse
-    {
-        $period = $request->get('period', 'daily'); // daily, weekly, monthly
-        $dateFrom = $request->get('date_from', now()->subDays(30)->toDateString());
-        $dateTo = $request->get('date_to', now()->toDateString());
+  public function salesSummary(Request $request): JsonResponse
+{
+    $period = $request->get('period', 'daily');
+    $dateFrom = $request->get('date_from', now()->subDays(30)->toDateString());
+    $dateTo = $request->get('date_to', now()->toDateString());
 
-        $baseQuery = Order::where('status', 'completed')
-            ->whereBetween('completed_at', [$dateFrom, $dateTo . ' 23:59:59']);
+    $baseQuery = Order::where('status', 'completed')
+        ->whereBetween('completed_at', [$dateFrom, $dateTo . ' 23:59:59']);
 
-        // Summary stats
-        $summary = $baseQuery->selectRaw('
-            COUNT(*) as total_orders,
-            SUM(total) as total_revenue,
-            AVG(total) as average_order_value,
-            SUM(subtotal) as subtotal_revenue,
-            SUM(tax) as total_tax
-        ')->first();
+    // Summary stats
+    $summary = (clone $baseQuery)->selectRaw('
+        COUNT(*) as total_orders,
+        SUM(total) as total_revenue,
+        AVG(total) as average_order_value,
+        SUM(subtotal) as subtotal_revenue,
+        SUM(tax) as total_tax
+    ')->first();
 
-        // Revenue by period
-        $groupBy = match($period) {
-            'weekly' => 'YEARWEEK(completed_at)',
-            'monthly' => 'DATE_FORMAT(completed_at, "%Y-%m")',
-            default => 'DATE(completed_at)',
-        };
-
-        $labelFormat = match($period) {
-            'weekly' => '%Y-W%u',
-            'monthly' => '%Y-%m',
-            default => '%Y-%m-%d',
-        };
-
-        $revenueByPeriod = (clone $baseQuery)->selectRaw("
-            DATE_FORMAT(completed_at, '{$labelFormat}') as period_label,
-            COUNT(*) as order_count,
-            SUM(total) as revenue
-        ")->groupByRaw($groupBy)
-          ->orderBy('period_label')
-          ->get();
-
-        return response()->json([
-            'summary' => $summary,
-            'revenue_by_period' => $revenueByPeriod,
-        ]);
+    // Revenue by period
+    switch ($period) {
+        case 'weekly':
+            $selectRaw = "DATE_FORMAT(completed_at, '%x-W%v') as period_label,
+                          COUNT(*) as order_count,
+                          SUM(total) as revenue";
+            $groupByRaw = "YEARWEEK(completed_at, 1)";
+            break;
+        case 'monthly':
+            $selectRaw = "DATE_FORMAT(completed_at, '%Y-%m') as period_label,
+                          COUNT(*) as order_count,
+                          SUM(total) as revenue";
+            $groupByRaw = "DATE_FORMAT(completed_at, '%Y-%m')";
+            break;
+        default: // daily
+            $selectRaw = "DATE(completed_at) as period_label,
+                          COUNT(*) as order_count,
+                          SUM(total) as revenue";
+            $groupByRaw = "DATE(completed_at)";
+            break;
     }
+
+    $revenueByPeriod = (clone $baseQuery)
+        ->selectRaw($selectRaw)
+        ->groupByRaw($groupByRaw)
+        ->orderBy('period_label')
+        ->get();
+
+    return response()->json([
+        'summary' => $summary,
+        'revenue_by_period' => $revenueByPeriod,
+    ]);
+}
 
     public function bestSellers(Request $request): JsonResponse
     {
