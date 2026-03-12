@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\MenuItem;
+use App\Models\InventoryLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -13,25 +14,25 @@ class OrderController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Order::with(['items', 'user', 'cashier']);
+        $query = Order::with(['user', 'items.menuItem'])
+            ->orderBy('created_at', 'desc');
 
-        if ($request->has('status')) {
+        // Only filter by status IF the request actually sends one
+        if ($request->has('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
         }
 
-        if ($request->has('user_id')) {
-            $query->where('user_id', $request->user_id);
-        }
+        $orders = $query->paginate($request->get('per_page', 200));
 
-        if ($request->has('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
-        }
+        return response()->json($orders);
+    }
 
-        if ($request->has('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
-        }
-
-        $orders = $query->latest()->paginate($request->get('per_page', 20));
+    public function myOrders(Request $request): JsonResponse
+    {
+        $orders = Order::with(['items.menuItem'])
+            ->where('user_id', $request->user()->id)
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->get('per_page', 200));
 
         return response()->json($orders);
     }
@@ -39,138 +40,117 @@ class OrderController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'items' => 'required|array|min:1',
+            'items'          => 'required|array|min:1',
             'items.*.menu_item_id' => 'required|exists:menu_items,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.special_instructions' => 'nullable|string',
+            'items.*.quantity'     => 'required|integer|min:1',
             'payment_method' => 'required|in:cash,card,digital_wallet',
-            'amount_paid' => 'required_if:payment_method,cash|numeric|min:0',
-            'notes' => 'nullable|string',
+            'amount_paid'    => 'required|numeric|min:0',
+            'notes'          => 'nullable|string|max:500',
         ]);
 
         return DB::transaction(function () use ($validated, $request) {
+
+            // ── 1. Calculate totals ──────────────────────────────────────
             $subtotal = 0;
-            $orderItems = [];
+            $itemsData = [];
 
-            foreach ($validated['items'] as $itemData) {
-                $menuItem = MenuItem::findOrFail($itemData['menu_item_id']);
+            foreach ($validated['items'] as $item) {
+                $menuItem = MenuItem::findOrFail($item['menu_item_id']);
 
-                if (!$menuItem->is_available) {
-                    return response()->json([
-                        'message' => "{$menuItem->name} is currently unavailable.",
-                    ], 422);
+                // ✅ Check stock availability
+                if ($menuItem->stock_quantity < $item['quantity']) {
+                    abort(422, "Insufficient stock for: {$menuItem->name}. Only {$menuItem->stock_quantity} left.");
                 }
 
-                if ($menuItem->stock_quantity < $itemData['quantity']) {
-                    return response()->json([
-                        'message' => "Insufficient stock for {$menuItem->name}. Available: {$menuItem->stock_quantity}",
-                    ], 422);
-                }
+                $lineTotal = $menuItem->price * $item['quantity'];
+                $subtotal += $lineTotal;
 
-                $itemSubtotal = $menuItem->price * $itemData['quantity'];
-                $subtotal += $itemSubtotal;
-
-                $orderItems[] = [
-                    'menuItem' => $menuItem,
-                    'quantity' => $itemData['quantity'],
-                    'unit_price' => $menuItem->price,
-                    'subtotal' => $itemSubtotal,
-                    'special_instructions' => $itemData['special_instructions'] ?? null,
+                $itemsData[] = [
+                    'menu_item'  => $menuItem,
+                    'quantity'   => $item['quantity'],
+                    'price'      => $menuItem->price,
+                    'subtotal'   => $lineTotal,
                 ];
             }
 
-            $tax = $subtotal * 0.12; // 12% VAT
-            $total = $subtotal + $tax;
-            $amountPaid = $validated['amount_paid'] ?? $total;
-            $changeGiven = max(0, $amountPaid - $total);
+            $tax         = $subtotal * 0.12;
+            $totalAmount = $subtotal + $tax;
+            $amountPaid  = $validated['payment_method'] === 'cash'
+                ? $validated['amount_paid']
+                : $totalAmount;
+            $change      = max(0, $amountPaid - $totalAmount);
 
+            // ── 2. Create the order ──────────────────────────────────────
             $order = Order::create([
-                'order_number' => Order::generateOrderNumber(),
-                'user_id' => $request->user()->id,
-                'cashier_id' => $request->user()->isCashier() ? $request->user()->id : null,
-                'status' => 'pending',
-                'subtotal' => $subtotal,
-                'tax' => $tax,
-                'total' => $total,
-                'amount_paid' => $amountPaid,
-                'change_given' => $changeGiven,
+                'user_id'        => $request->user()->id,
+                'status'         => 'pending',
+                'subtotal'       => $subtotal,
+                'tax'            => $tax,
+                'total_amount'   => $totalAmount,
                 'payment_method' => $validated['payment_method'],
-                'notes' => $validated['notes'] ?? null,
+                'amount_paid'    => $amountPaid,
+                'change_given'   => $change,
+                'notes'          => $validated['notes'] ?? null,
             ]);
 
-            foreach ($orderItems as $item) {
+            // ── 3. Create order items + auto-deduct inventory ────────────
+            foreach ($itemsData as $item) {
                 OrderItem::create([
-                    'order_id' => $order->id,
-                    'menu_item_id' => $item['menuItem']->id,
-                    'item_name' => $item['menuItem']->name,
-                    'unit_price' => $item['unit_price'],
-                    'quantity' => $item['quantity'],
-                    'subtotal' => $item['subtotal'],
-                    'special_instructions' => $item['special_instructions'],
+                    'order_id'     => $order->id,
+                    'menu_item_id' => $item['menu_item']->id,
+                    'quantity'     => $item['quantity'],
+                    'price'        => $item['price'],
+                    'subtotal'     => $item['subtotal'],
                 ]);
 
-                $item['menuItem']->decreaseStock(
-                    $item['quantity'],
-                    $order->id,
-                    $request->user()->id
-                );
+                // ✅ AUTO-DEDUCT: subtract stock
+                $item['menu_item']->decrement('stock_quantity', $item['quantity']);
+
+                // ✅ AUTO-DEDUCT: log the stock change
+                InventoryLog::create([
+                    'menu_item_id' => $item['menu_item']->id,
+                    'user_id'      => $request->user()->id,
+                    'type'         => 'deduct',
+                    'quantity'     => $item['quantity'],
+                    'reason'       => "Order #{$order->id}",
+                    'stock_before' => $item['menu_item']->stock_quantity + $item['quantity'],
+                    'stock_after'  => $item['menu_item']->stock_quantity,
+                ]);
+
+                // ✅ Auto-mark unavailable if out of stock
+                if ($item['menu_item']->fresh()->stock_quantity <= 0) {
+                    $item['menu_item']->update(['is_available' => false]);
+                }
             }
 
-            return response()->json([
-                'message' => 'Order placed successfully',
-                'data' => $order->load(['items', 'user', 'cashier']),
-            ], 201);
+            // ── 4. Return order with items ───────────────────────────────
+            return response()->json(
+                $order->load('items.menuItem'),
+                201
+            );
         });
     }
 
     public function show(Order $order): JsonResponse
     {
-        return response()->json($order->load(['items.menuItem', 'user', 'cashier']));
+        return response()->json($order->load(['user', 'items.menuItem']));
     }
 
     public function updateStatus(Request $request, Order $order): JsonResponse
     {
         $validated = $request->validate([
             'status' => 'required|in:pending,preparing,ready,completed,cancelled',
+            'notes'  => 'nullable|string',
         ]);
 
-        if (!$order->canTransitionTo($validated['status'])) {
-            return response()->json([
-                'message' => "Cannot transition from '{$order->status}' to '{$validated['status']}'",
-            ], 422);
-        }
-
-        $updateData = ['status' => $validated['status']];
-
-        if ($validated['status'] === 'completed') {
-            $updateData['completed_at'] = now();
-        }
-
-        $order->update($updateData);
-
-        return response()->json([
-            'message' => 'Order status updated',
-            'data' => $order->fresh()->load(['items', 'user', 'cashier']),
+        $order->update([
+            'status'       => $validated['status'],
+            'notes'        => $validated['notes'] ?? $order->notes,
+            'completed_at' => in_array($validated['status'], ['completed', 'cancelled'])
+                ? now()
+                : $order->completed_at,
         ]);
-    }
 
-    public function myOrders(Request $request): JsonResponse
-    {
-        $orders = Order::where('user_id', $request->user()->id)
-            ->with('items')
-            ->latest()
-            ->paginate(10);
-
-        return response()->json($orders);
-    }
-
-    public function queue(): JsonResponse
-    {
-        $orders = Order::whereIn('status', ['pending', 'preparing', 'ready'])
-            ->with(['items.menuItem'])
-            ->orderBy('created_at')
-            ->get();
-
-        return response()->json($orders);
+        return response()->json($order->load(['user', 'items.menuItem']));
     }
 }

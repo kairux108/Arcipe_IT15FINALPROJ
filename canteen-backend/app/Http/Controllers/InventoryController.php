@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\InventoryLog;
 use App\Models\MenuItem;
+use App\Models\InventoryLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -12,126 +12,152 @@ class InventoryController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = MenuItem::with('category')->select([
-            'id', 'name', 'category_id', 'stock_quantity',
-            'low_stock_threshold', 'is_available', 'price',
-        ]);
-
-        if ($request->has('low_stock') && $request->low_stock === 'true') {
-            $query->whereRaw('stock_quantity <= low_stock_threshold');
-        }
+        $query = MenuItem::with('category')->orderBy('name');
 
         if ($request->has('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%');
+            $query->where('name', 'like', "%{$request->search}%");
         }
 
-        $items = $query->orderBy('stock_quantity')->paginate($request->get('per_page', 20));
+        if ($request->has('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
 
-        return response()->json($items);
+        return response()->json($query->paginate($request->get('per_page', 100)));
     }
 
+    public function lowStock(): JsonResponse
+    {
+        $items = MenuItem::with('category')
+            ->where('stock_quantity', '<=', 15)
+            ->orderBy('stock_quantity')
+            ->get();
+
+        return response()->json(['items' => $items]);
+    }
+
+    // ✅ Restock a single item
     public function restock(Request $request, MenuItem $menuItem): JsonResponse
     {
         $validated = $request->validate([
             'quantity' => 'required|integer|min:1',
-            'reason' => 'nullable|string|max:255',
+            'reason'   => 'nullable|string|max:255',
         ]);
 
-        $menuItem->increaseStock(
-            $validated['quantity'],
-            $validated['reason'] ?? 'Manual restock',
-            $request->user()->id
-        );
+        return DB::transaction(function () use ($validated, $menuItem, $request) {
+            $before = $menuItem->stock_quantity;
+            $menuItem->increment('stock_quantity', $validated['quantity']);
+            $after  = $menuItem->fresh()->stock_quantity;
 
-        return response()->json([
-            'message' => 'Stock updated successfully',
-            'data' => $menuItem->fresh(),
-        ]);
+            // Re-enable if it was marked unavailable due to 0 stock
+            if ($before <= 0) {
+                $menuItem->update(['is_available' => true]);
+            }
+
+            InventoryLog::create([
+                'menu_item_id' => $menuItem->id,
+                'user_id'      => $request->user()->id,
+                'type'         => 'restock',
+                'quantity'     => $validated['quantity'],
+                'reason'       => $validated['reason'] ?? 'Manual restock',
+                'stock_before' => $before,
+                'stock_after'  => $after,
+            ]);
+
+            return response()->json([
+                'message'      => 'Restocked successfully',
+                'menu_item'    => $menuItem->fresh(),
+                'stock_before' => $before,
+                'stock_after'  => $after,
+            ]);
+        });
     }
 
+    // ✅ Bulk restock multiple items at once
     public function bulkRestock(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'items' => 'required|array|min:1',
-            'items.*.menu_item_id' => 'required|exists:menu_items,id',
+            'items'            => 'required|array|min:1',
+            'items.*.id'       => 'required|exists:menu_items,id',
             'items.*.quantity' => 'required|integer|min:1',
-            'reason' => 'nullable|string|max:255',
+            'reason'           => 'nullable|string|max:255',
         ]);
 
-        DB::transaction(function () use ($validated, $request) {
+        return DB::transaction(function () use ($validated, $request) {
+            $results = [];
             foreach ($validated['items'] as $item) {
-                $menuItem = MenuItem::find($item['menu_item_id']);
-                $menuItem->increaseStock(
-                    $item['quantity'],
-                    $validated['reason'] ?? 'Bulk restock',
-                    $request->user()->id
-                );
-            }
-        });
+                $menuItem = MenuItem::findOrFail($item['id']);
+                $before   = $menuItem->stock_quantity;
+                $menuItem->increment('stock_quantity', $item['quantity']);
+                $after    = $menuItem->fresh()->stock_quantity;
 
-        return response()->json(['message' => 'Bulk restock completed']);
+                if ($before <= 0) {
+                    $menuItem->update(['is_available' => true]);
+                }
+
+                InventoryLog::create([
+                    'menu_item_id' => $menuItem->id,
+                    'user_id'      => $request->user()->id,
+                    'type'         => 'restock',
+                    'quantity'     => $item['quantity'],
+                    'reason'       => $validated['reason'] ?? 'Bulk restock',
+                    'stock_before' => $before,
+                    'stock_after'  => $after,
+                ]);
+
+                $results[] = ['id' => $menuItem->id, 'name' => $menuItem->name, 'stock_after' => $after];
+            }
+
+            return response()->json(['message' => 'Bulk restock successful', 'items' => $results]);
+        });
     }
 
+    // ✅ Manual stock adjustment (add or subtract)
     public function adjust(Request $request, MenuItem $menuItem): JsonResponse
     {
         $validated = $request->validate([
-            'quantity' => 'required|integer',
-            'reason' => 'required|string|max:255',
+            'quantity' => 'required|integer|min:1',
+            'type'     => 'required|in:add,subtract',
+            'reason'   => 'nullable|string|max:255',
         ]);
 
-        $before = $menuItem->stock_quantity;
-        $newQuantity = max(0, $before + $validated['quantity']);
+        return DB::transaction(function () use ($validated, $menuItem, $request) {
+            $before = $menuItem->stock_quantity;
 
-        InventoryLog::create([
-            'menu_item_id' => $menuItem->id,
-            'user_id' => $request->user()->id,
-            'type' => 'adjustment',
-            'quantity_before' => $before,
-            'quantity_change' => $validated['quantity'],
-            'quantity_after' => $newQuantity,
-            'reason' => $validated['reason'],
-        ]);
+            if ($validated['type'] === 'add') {
+                $menuItem->increment('stock_quantity', $validated['quantity']);
+            } else {
+                $newQty = max(0, $before - $validated['quantity']);
+                $menuItem->update(['stock_quantity' => $newQty]);
+            }
 
-        $menuItem->update([
-            'stock_quantity' => $newQuantity,
-            'is_available' => $newQuantity > 0,
-        ]);
+            $after = $menuItem->fresh()->stock_quantity;
 
-        return response()->json([
-            'message' => 'Stock adjusted',
-            'data' => $menuItem->fresh(),
-        ]);
+            InventoryLog::create([
+                'menu_item_id' => $menuItem->id,
+                'user_id'      => $request->user()->id,
+                'type'         => 'adjust',
+                'quantity'     => $validated['quantity'],
+                'reason'       => $validated['reason'] ?? 'Manual adjustment',
+                'stock_before' => $before,
+                'stock_after'  => $after,
+            ]);
+
+            return response()->json([
+                'message'   => 'Stock adjusted',
+                'menu_item' => $menuItem->fresh(),
+                'stock_before' => $before,
+                'stock_after'  => $after,
+            ]);
+        });
     }
 
+    // ✅ Inventory log history
     public function logs(Request $request): JsonResponse
     {
-        $query = InventoryLog::with(['menuItem', 'user', 'order'])
-            ->latest();
-
-        if ($request->has('menu_item_id')) {
-            $query->where('menu_item_id', $request->menu_item_id);
-        }
-
-        if ($request->has('type')) {
-            $query->where('type', $request->type);
-        }
-
-        $logs = $query->paginate($request->get('per_page', 30));
+        $logs = InventoryLog::with(['menuItem', 'user'])
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->get('per_page', 50));
 
         return response()->json($logs);
-    }
-
-    public function lowStockAlerts(): JsonResponse
-    {
-        $items = MenuItem::with('category')
-            ->whereRaw('stock_quantity <= low_stock_threshold')
-            ->where('is_available', true)
-            ->orderBy('stock_quantity')
-            ->get();
-
-        return response()->json([
-            'count' => $items->count(),
-            'items' => $items,
-        ]);
     }
 }
