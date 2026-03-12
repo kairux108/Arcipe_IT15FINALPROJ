@@ -146,7 +146,7 @@ class OrderController extends Controller
                     'quantity_before' => $stockBefore,
                     'quantity_change' => $item['quantity'],
                     'quantity_after'  => $stockAfter,
-                    'reason'          => "Order #{$order->order_number}",
+                    'reason'          => "Order deduction",
                     'order_id'        => $order->id,
                 ]);
 
