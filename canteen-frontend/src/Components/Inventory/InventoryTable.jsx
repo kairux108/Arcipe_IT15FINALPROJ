@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../Context/AuthContext';
 import { inventoryService } from '../../Services/orderService';
 import LoadingSpinner from '../Common/LoadingSpinner';
 
 const LOW_STOCK_THRESHOLD = 15;
-const CRITICAL_THRESHOLD = 5;
+const CRITICAL_THRESHOLD  = 5;
 
 const stockStatus = (qty) => {
-  if (qty <= CRITICAL_THRESHOLD)  return { label: 'Critical', bg: 'rgba(239,71,111,0.15)',  color: '#EF476F', border: '1px solid rgba(239,71,111,0.3)' };
-  if (qty <= LOW_STOCK_THRESHOLD) return { label: 'Low',      bg: 'rgba(255,209,102,0.15)', color: '#FFD166', border: '1px solid rgba(255,209,102,0.3)' };
-  return                                 { label: 'OK',        bg: 'rgba(6,214,160,0.15)',   color: '#06D6A0', border: '1px solid rgba(6,214,160,0.3)' };
+  if (qty <= 0)                   return { label: 'Out of Stock', bg: 'rgba(239,71,111,0.15)',  color: '#EF476F', border: '1px solid rgba(239,71,111,0.3)' };
+  if (qty <= CRITICAL_THRESHOLD)  return { label: 'Critical',     bg: 'rgba(239,71,111,0.15)',  color: '#EF476F', border: '1px solid rgba(239,71,111,0.3)' };
+  if (qty <= LOW_STOCK_THRESHOLD) return { label: 'Low',          bg: 'rgba(255,209,102,0.15)', color: '#FFD166', border: '1px solid rgba(255,209,102,0.3)' };
+  return                                 { label: 'OK',            bg: 'rgba(6,214,160,0.15)',   color: '#06D6A0', border: '1px solid rgba(6,214,160,0.3)' };
 };
 
-// Override Bootstrap's table styles to respect dark mode
 const tableOverride = `
   .inv-table { color: var(--text-primary) !important; background: transparent !important; }
   .inv-table thead tr { background: var(--surface-2) !important; }
@@ -24,25 +26,29 @@ const tableOverride = `
 `;
 
 export default function InventoryTable() {
-  const [inventory, setInventory] = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [search, setSearch]       = useState('');
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const role = user?.role ?? 'admin';
+
+  const [inventory, setInventory]         = useState([]);
+  const [loading, setLoading]             = useState(true);
+  const [search, setSearch]               = useState('');
   const [restockItem, setRestockItem]     = useState(null);
   const [restockQty, setRestockQty]       = useState('');
   const [restockReason, setRestockReason] = useState('');
   const [saving, setSaving]               = useState(false);
 
   useEffect(() => { load(); }, []);
-const load = async () => {
+
+  const load = async () => {
     setLoading(true);
     try {
-      // Pass per_page: 100 to override the backend default of 20
-      const data = await inventoryService.getInventory({ per_page: 100 });
+      const data = await inventoryService.getInventory({ per_page: 200 });
       setInventory(data.data || data || []);
-    } catch (err) { 
-      console.error(err); 
-    } finally { 
-      setLoading(false); 
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -55,15 +61,18 @@ const load = async () => {
       setRestockQty('');
       setRestockReason('');
       await load();
-    } catch (err) { console.error(err); }
-    finally { setSaving(false); }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const filtered = (inventory || []).filter(i =>
     (i.name || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  const fmt = (n) => `₱${parseFloat(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+  const fmt      = (n) => `₱${parseFloat(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
   const critical = (inventory || []).filter(i => i.stock_quantity <= CRITICAL_THRESHOLD).length;
   const low      = (inventory || []).filter(i => i.stock_quantity > CRITICAL_THRESHOLD && i.stock_quantity <= LOW_STOCK_THRESHOLD).length;
 
@@ -78,16 +87,28 @@ const load = async () => {
           <div>
             <h2 className="fw-bold mb-1" style={{ fontSize: 20, color: 'var(--text-primary)' }}>Inventory</h2>
             <p className="mb-0" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              {critical} critical · {low} low stock
+              {critical > 0 && <span style={{ color: '#EF476F', fontWeight: 600 }}>{critical} critical · </span>}
+              {low > 0      && <span style={{ color: '#FFD166', fontWeight: 600 }}>{low} low · </span>}
+              {inventory.length} total items
             </p>
           </div>
-          <button
-            className="btn fw-semibold"
-            onClick={load}
-            style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 10, fontSize: 13, padding: '8px 16px' }}
-          >
-            🔄 Refresh
-          </button>
+          <div className="d-flex gap-2">
+            {/* View Log button */}
+            <button
+              className="btn fw-semibold"
+              onClick={() => navigate(`/${role}/inventory/log`)}
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 10, fontSize: 13, padding: '8px 16px' }}
+            >
+              📋 View Log
+            </button>
+            <button
+              className="btn fw-semibold"
+              onClick={load}
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 10, fontSize: 13, padding: '8px 16px' }}
+            >
+              🔄 Refresh
+            </button>
+          </div>
         </div>
 
         {/* Search */}
@@ -120,7 +141,7 @@ const load = async () => {
                       <td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>No items found</td>
                     </tr>
                   ) : filtered.map(item => {
-                    const st = stockStatus(item.stock_quantity);
+                    const st        = stockStatus(item.stock_quantity);
                     const threshold = item.low_stock_threshold ?? LOW_STOCK_THRESHOLD;
                     return (
                       <tr key={item.id}>
@@ -143,7 +164,7 @@ const load = async () => {
                         <td>
                           <button
                             className="btn btn-sm fw-semibold"
-                            onClick={() => setRestockItem(item)}
+                            onClick={() => { setRestockItem(item); setRestockQty(''); setRestockReason(''); }}
                             style={{ background: 'rgba(6,214,160,0.1)', border: '1px solid rgba(6,214,160,0.3)', color: '#06D6A0', borderRadius: 8, fontSize: 12, padding: '5px 14px' }}
                           >
                             + Restock
@@ -182,11 +203,10 @@ const load = async () => {
               >✕</button>
             </div>
 
-            {/* Stats */}
             <div className="row g-2 mb-4">
               {[
                 { label: 'Current Stock', value: `${restockItem.stock_quantity} units`, color: stockStatus(restockItem.stock_quantity).color },
-                { label: 'Threshold', value: `≤ ${restockItem.low_stock_threshold ?? LOW_STOCK_THRESHOLD} units`, color: 'var(--text-muted)' },
+                { label: 'Threshold',     value: `≤ ${restockItem.low_stock_threshold ?? LOW_STOCK_THRESHOLD} units`, color: 'var(--text-muted)' },
               ].map(s => (
                 <div key={s.label} className="col-6">
                   <div className="rounded-3 p-3" style={{ background: 'var(--surface-2)' }}>
@@ -231,20 +251,16 @@ const load = async () => {
               )}
 
               <div className="d-flex gap-2 mt-2">
-                <button
-                  className="btn fw-semibold flex-fill"
+                <button className="btn fw-semibold flex-fill"
                   onClick={() => setRestockItem(null)}
-                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 10 }}
-                >Cancel</button>
-                <button
-                  className="btn fw-bold flex-fill"
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 10 }}>
+                  Cancel
+                </button>
+                <button className="btn fw-bold flex-fill"
                   onClick={handleRestock}
                   disabled={saving || !restockQty || parseInt(restockQty) <= 0}
-                  style={{ background: '#06D6A0', color: '#0F1923', border: 'none', borderRadius: 10 }}
-                >
-                  {saving
-                    ? <span className="spinner-border spinner-border-sm" />
-                    : '+ Add Stock'}
+                  style={{ background: '#06D6A0', color: '#0F1923', border: 'none', borderRadius: 10 }}>
+                  {saving ? <span className="spinner-border spinner-border-sm" /> : '+ Add Stock'}
                 </button>
               </div>
             </div>
