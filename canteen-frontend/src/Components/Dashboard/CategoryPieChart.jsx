@@ -5,16 +5,21 @@ const COLORS = ['#FF6B35', '#FFD166', '#06D6A0', '#118AB2', '#8B5CF6'];
 const TOOLTIP_STYLE = {
   background: 'var(--surface-2)',
   border: '1px solid var(--border-default)',
-  borderRadius: '8px',
+  borderRadius: 10,
   padding: '10px 14px',
-  fontSize: '13px',
+  fontSize: 13,
   color: 'var(--text-primary)',
 };
 
 export default function CategoryPieChart({ data = [] }) {
   return (
-    <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
-      <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>Sales by Category</h3>
+    <div
+      className="rounded-3 p-4 h-100"
+      style={{ background: 'var(--surface-card)', border: '1px solid var(--border-subtle)' }}
+    >
+      <h3 className="fw-bold mb-4" style={{ fontSize: 15, color: 'var(--text-primary)' }}>
+        Sales by Category
+      </h3>
       <ResponsiveContainer width="100%" height={220}>
         <PieChart>
           <Pie

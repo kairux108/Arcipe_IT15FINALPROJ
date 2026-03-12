@@ -1,138 +1,100 @@
 import api from './api';
 
-export const orderService = {
-  async getOrders(params = {}) {
-    const { data } = await api.get('/orders', { params });
-    return data;
-  },
-
-  async getMyOrders(params = {}) {
-    const { data } = await api.get('/orders/my', { params });
-    return data;
-  },
-
-  async getOrder(id) {
-    const { data } = await api.get(`/orders/${id}`);
-    return data;
-  },
-
-  async createOrder(orderData) {
-    const { data } = await api.post('/orders', orderData);
-    return data;
-  },
-
-  async updateStatus(id, status) {
-    const { data } = await api.patch(`/orders/${id}/status`, { status });
-    return data;
-  },
-
-  async getQueue() {
-    const { data } = await api.get('/orders-queue');
-    return data;
-  },
-};
-
+// ─── Menu ────────────────────────────────────────────────────────────────────
 export const menuService = {
-  async getItems(params = {}) {
-    const { data } = await api.get('/menu', { params });
-    return data;
-  },
+  getItems: (params = {}) =>
+    api.get('/menu', { params }).then(r => r.data),
 
-  async getItem(id) {
-    const { data } = await api.get(`/menu/${id}`);
-    return data;
-  },
+  getItem: (id) =>
+    api.get(`/menu/${id}`).then(r => r.data),
 
-  async createItem(formData) {
-    const { data } = await api.post('/menu', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return data;
-  },
+  getCategories: () =>
+    api.get('/categories').then(r => r.data),
 
-  async updateItem(id, formData) {
-    const { data } = await api.put(`/menu/${id}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return data;
-  },
+  createItem: (data) =>
+    api.post('/menu', data),
 
-  async deleteItem(id) {
-    const { data } = await api.delete(`/menu/${id}`);
-    return data;
-  },
+  updateItem: (id, data) =>
+    api.put(`/menu/${id}`, data),
 
-  async toggleAvailability(id) {
-    const { data } = await api.patch(`/menu/${id}/toggle-availability`);
-    return data;
-  },
+  deleteItem: (id) =>
+    api.delete(`/menu/${id}`),
 
-  async getCategories() {
-    const { data } = await api.get('/categories');
-    return data;
-  },
-
-  async createCategory(categoryData) {
-    const { data } = await api.post('/categories', categoryData);
-    return data;
-  },
+  toggleAvailability: (id) =>
+    api.patch(`/menu/${id}/toggle-availability`),
 };
 
+// ─── Orders ──────────────────────────────────────────────────────────────────
+export const orderService = {
+  getOrders: (params = {}) =>
+    api.get('/orders', { params }).then(r => r.data),
+
+  getOrder: (id) =>
+    api.get(`/orders/${id}`).then(r => r.data),
+
+  getQueue: (params = {}) =>
+    api.get('/orders-queue', { params }).then(r => r.data),
+
+  getMyOrders: (params = {}) =>
+    api.get('/orders/my', { params }).then(r => r.data),
+
+  createOrder: (data) =>
+    api.post('/orders', data).then(r => r.data),
+
+  updateStatus: (id, status, notes = '') =>
+    api.patch(`/orders/${id}/status`, { status, notes }).then(r => r.data),
+
+  cancelOrder: (id, reason = '') =>
+    api.patch(`/orders/${id}/status`, { status: 'cancelled', notes: reason }).then(r => r.data),
+};
+
+// ─── Inventory ───────────────────────────────────────────────────────────────
 export const inventoryService = {
-  async getInventory(params = {}) {
-    const { data } = await api.get('/inventory', { params });
-    return data;
-  },
+  getInventory: (params = {}) =>
+    api.get('/inventory', { params }).then(r => r.data),
 
-  async restock(menuItemId, quantity, reason) {
-    const { data } = await api.post(`/inventory/${menuItemId}/restock`, { quantity, reason });
-    return data;
-  },
+  getLowStockAlerts: () =>
+    api.get('/inventory/low-stock').then(r => r.data),
 
-  async bulkRestock(items, reason) {
-    const { data } = await api.post('/inventory/bulk-restock', { items, reason });
-    return data;
-  },
+  restockItem: (id, quantity, reason = '') =>
+    api.post(`/inventory/${id}/restock`, { quantity, reason }).then(r => r.data),
 
-  async adjust(menuItemId, quantity, reason) {
-    const { data } = await api.post(`/inventory/${menuItemId}/adjust`, { quantity, reason });
-    return data;
-  },
+  bulkRestock: (items) =>
+    api.post('/inventory/bulk-restock', { items }).then(r => r.data),
 
-  async getLogs(params = {}) {
-    const { data } = await api.get('/inventory/logs', { params });
-    return data;
-  },
+  adjustStock: (id, quantity, type, reason = '') =>
+    api.post(`/inventory/${id}/adjust`, { quantity, type, reason }).then(r => r.data),
 
-  async getLowStockAlerts() {
-    const { data } = await api.get('/inventory/low-stock');
-    return data;
-  },
+  getLogs: (params = {}) =>
+    api.get('/inventory/logs', { params }).then(r => r.data),
 };
 
+// ─── Reports ─────────────────────────────────────────────────────────────────
 export const reportService = {
-  async getSalesSummary(params = {}) {
-    const { data } = await api.get('/reports/sales-summary', { params });
-    return data;
-  },
+  getSalesSummary: (params = {}) =>
+    api.get('/reports/sales-summary', { params }).then(r => r.data),
 
-  async getBestSellers(params = {}) {
-    const { data } = await api.get('/reports/best-sellers', { params });
-    return data;
-  },
+  getBestSellers: (params = {}) =>
+    api.get('/reports/best-sellers', { params }).then(r => r.data),
 
-  async getSalesByCategory(params = {}) {
-    const { data } = await api.get('/reports/sales-by-category', { params });
-    return data;
-  },
+  getTopItems: (params = {}) =>
+    api.get('/reports/best-sellers', { params }).then(r => r.data),
 
-  async getOrderTrends(params = {}) {
-    const { data } = await api.get('/reports/order-trends', { params });
-    return data;
-  },
+  getSalesByCategory: (params = {}) =>
+    api.get('/reports/sales-by-category', { params }).then(r => r.data),
 
-  exportCsv(params = {}) {
-    const queryString = new URLSearchParams(params).toString();
-    window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/reports/export-csv?${queryString}`, '_blank');
-  },
+  getOrderTrends: (params = {}) =>
+    api.get('/reports/order-trends', { params }).then(r => r.data),
+
+  exportCsv: (params = {}) =>
+    api.get('/reports/export-csv', { params, responseType: 'blob' }).then(r => {
+      const url  = window.URL.createObjectURL(new Blob([r.data]));
+      const link = document.createElement('a');
+      link.href  = url;
+      link.setAttribute('download', `sales-report-${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    }),
 };

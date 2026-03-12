@@ -1,188 +1,256 @@
 import { useState, useEffect } from 'react';
 import { inventoryService } from '../../Services/orderService';
 import LoadingSpinner from '../Common/LoadingSpinner';
-import styles from './InventoryTable.module.css';
+
+const LOW_STOCK_THRESHOLD = 15;
+const CRITICAL_THRESHOLD = 5;
+
+const stockStatus = (qty) => {
+  if (qty <= CRITICAL_THRESHOLD)  return { label: 'Critical', bg: 'rgba(239,71,111,0.15)',  color: '#EF476F', border: '1px solid rgba(239,71,111,0.3)' };
+  if (qty <= LOW_STOCK_THRESHOLD) return { label: 'Low',      bg: 'rgba(255,209,102,0.15)', color: '#FFD166', border: '1px solid rgba(255,209,102,0.3)' };
+  return                                 { label: 'OK',        bg: 'rgba(6,214,160,0.15)',   color: '#06D6A0', border: '1px solid rgba(6,214,160,0.3)' };
+};
+
+// Override Bootstrap's table styles to respect dark mode
+const tableOverride = `
+  .inv-table { color: var(--text-primary) !important; background: transparent !important; }
+  .inv-table thead tr { background: var(--surface-2) !important; }
+  .inv-table thead th { color: var(--text-muted) !important; background: var(--surface-2) !important; border-color: var(--border-subtle) !important; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 10px 16px; }
+  .inv-table tbody td { color: var(--text-primary) !important; background: transparent !important; border-color: var(--border-subtle) !important; vertical-align: middle; }
+  .inv-table tbody tr:hover td { background: rgba(255,107,53,0.04) !important; }
+  .inv-input { background: var(--surface-2) !important; border: 1px solid var(--border-subtle) !important; color: var(--text-primary) !important; border-radius: 10px !important; }
+  .inv-input:focus { background: var(--surface-2) !important; color: var(--text-primary) !important; border-color: #FF6B35 !important; box-shadow: 0 0 0 3px rgba(255,107,53,0.15) !important; }
+  .inv-select { background: var(--surface-2) !important; border: 1px solid var(--border-subtle) !important; color: var(--text-primary) !important; border-radius: 10px !important; }
+`;
 
 export default function InventoryTable() {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [showLowStock, setShowLowStock] = useState(false);
-  const [restockModal, setRestockModal] = useState(null);
-  const [restockQty, setRestockQty] = useState('');
+  const [inventory, setInventory] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [search, setSearch]       = useState('');
+  const [restockItem, setRestockItem]     = useState(null);
+  const [restockQty, setRestockQty]       = useState('');
   const [restockReason, setRestockReason] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]               = useState(false);
 
-  useEffect(() => {
-    loadInventory();
-  }, [showLowStock]);
-
-  const loadInventory = async () => {
+  useEffect(() => { load(); }, []);
+const load = async () => {
     setLoading(true);
     try {
-      const data = await inventoryService.getInventory({
-        low_stock: showLowStock ? 'true' : undefined,
-        search: search || undefined,
-        per_page: 50,
-      });
-      setItems(data.data || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+      // Pass per_page: 100 to override the backend default of 20
+      const data = await inventoryService.getInventory({ per_page: 100 });
+      setInventory(data.data || data || []);
+    } catch (err) { 
+      console.error(err); 
+    } finally { 
+      setLoading(false); 
     }
-  };
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    loadInventory();
   };
 
   const handleRestock = async () => {
-    if (!restockQty || !restockModal) return;
+    if (!restockQty || parseInt(restockQty) <= 0) return;
     setSaving(true);
     try {
-      await inventoryService.restock(restockModal.id, parseInt(restockQty), restockReason || 'Manual restock');
-      setRestockModal(null);
+      await inventoryService.restockItem(restockItem.id, parseInt(restockQty), restockReason);
+      setRestockItem(null);
       setRestockQty('');
       setRestockReason('');
-      loadInventory();
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to restock');
-    } finally {
-      setSaving(false);
-    }
+      await load();
+    } catch (err) { console.error(err); }
+    finally { setSaving(false); }
   };
 
-  const getStockStatus = (item) => {
-    if (item.stock_quantity <= 0) return { label: 'Out of Stock', cls: 'badge-danger' };
-    if (item.stock_quantity <= item.low_stock_threshold) return { label: 'Low Stock', cls: 'badge-warning' };
-    return { label: 'In Stock', cls: 'badge-success' };
-  };
+  const filtered = (inventory || []).filter(i =>
+    (i.name || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  const fmt = (n) => `₱${parseFloat(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+  const critical = (inventory || []).filter(i => i.stock_quantity <= CRITICAL_THRESHOLD).length;
+  const low      = (inventory || []).filter(i => i.stock_quantity > CRITICAL_THRESHOLD && i.stock_quantity <= LOW_STOCK_THRESHOLD).length;
 
   return (
-    <div className={styles.inventory}>
-      <div className={styles.toolbar}>
-        <form onSubmit={handleSearch} className={styles.searchForm}>
-          <input
-            type="search"
-            className="form-input"
-            placeholder="🔍 Search items..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <button type="submit" className="btn btn-secondary">Search</button>
-        </form>
-        <div className={styles.filters}>
+    <>
+      <style>{tableOverride}</style>
+
+      <div className="d-flex flex-column gap-4" style={{ animation: 'fadeIn 0.3s ease' }}>
+
+        {/* Header */}
+        <div className="d-flex align-items-start justify-content-between flex-wrap gap-3">
+          <div>
+            <h2 className="fw-bold mb-1" style={{ fontSize: 20, color: 'var(--text-primary)' }}>Inventory</h2>
+            <p className="mb-0" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              {critical} critical · {low} low stock
+            </p>
+          </div>
           <button
-            className={`btn ${showLowStock ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setShowLowStock(s => !s)}
+            className="btn fw-semibold"
+            onClick={load}
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 10, fontSize: 13, padding: '8px 16px' }}
           >
-            ⚠️ Low Stock Only
+            🔄 Refresh
           </button>
-          <button className="btn btn-secondary" onClick={loadInventory}>↻ Refresh</button>
+        </div>
+
+        {/* Search */}
+        <input
+          type="text"
+          className="form-control inv-input"
+          placeholder="🔍 Search inventory..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ maxWidth: 340, padding: '10px 14px', fontSize: 13 }}
+        />
+
+        {/* Table Card */}
+        <div className="rounded-3 overflow-hidden" style={{ background: 'var(--surface-card)', border: '1px solid var(--border-subtle)' }}>
+          {loading ? (
+            <div className="d-flex justify-content-center py-5"><LoadingSpinner /></div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table mb-0 inv-table">
+                <thead>
+                  <tr>
+                    {['Item', 'Category', 'Price', 'Stock', 'Threshold', 'Status', 'Action'].map(h => (
+                      <th key={h}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-5" style={{ color: 'var(--text-muted)' }}>No items found</td>
+                    </tr>
+                  ) : filtered.map(item => {
+                    const st = stockStatus(item.stock_quantity);
+                    const threshold = item.low_stock_threshold ?? LOW_STOCK_THRESHOLD;
+                    return (
+                      <tr key={item.id}>
+                        <td className="fw-semibold">{item.name}</td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{item.category?.name || '—'}</td>
+                        <td className="fw-bold" style={{ color: '#FF6B35' }}>{fmt(item.price)}</td>
+                        <td>
+                          <span className="fw-bold" style={{ fontSize: 15 }}>{item.stock_quantity}</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 4 }}>units</span>
+                        </td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>≤ {threshold} units</td>
+                        <td>
+                          <span className="fw-bold" style={{
+                            display: 'inline-block', padding: '4px 12px', borderRadius: 99, fontSize: 12,
+                            background: st.bg, color: st.color, border: st.border,
+                          }}>
+                            {st.label}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-sm fw-semibold"
+                            onClick={() => setRestockItem(item)}
+                            style={{ background: 'rgba(6,214,160,0.1)', border: '1px solid rgba(6,214,160,0.3)', color: '#06D6A0', borderRadius: 8, fontSize: 12, padding: '5px 14px' }}
+                          >
+                            + Restock
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
-      {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><LoadingSpinner /></div>
-      ) : (
-        <div className={styles.tableWrap}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Item Name</th>
-                <th>Category</th>
-                <th>Stock Qty</th>
-                <th>Threshold</th>
-                <th>Status</th>
-                <th>Price</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map(item => {
-                const status = getStockStatus(item);
-                return (
-                  <tr key={item.id}>
-                    <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{item.name}</td>
-                    <td>{item.category?.name || '—'}</td>
-                    <td>
-                      <span style={{
-                        fontWeight: 700,
-                        color: item.stock_quantity <= 0 ? 'var(--brand-danger)' :
-                               item.stock_quantity <= item.low_stock_threshold ? 'var(--brand-warning)' :
-                               'var(--text-primary)'
-                      }}>
-                        {item.stock_quantity}
-                      </span>
-                    </td>
-                    <td>{item.low_stock_threshold}</td>
-                    <td>
-                      <span className={`badge ${status.cls}`}>{status.label}</span>
-                    </td>
-                    <td>₱{parseFloat(item.price).toFixed(2)}</td>
-                    <td>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ padding: '5px 12px', fontSize: 12 }}
-                        onClick={() => setRestockModal(item)}
-                      >
-                        + Restock
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {items.length === 0 && (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    No inventory items found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
       {/* Restock Modal */}
-      {restockModal && (
-        <div className={styles.modalOverlay} onClick={() => setRestockModal(null)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <h3>Restock: {restockModal.name}</h3>
-            <p className={styles.currentStock}>Current stock: <strong>{restockModal.stock_quantity}</strong></p>
-            <div className="form-group">
-              <label className="form-label">Quantity to Add</label>
-              <input
-                type="number"
-                className="form-input"
-                placeholder="Enter quantity"
-                value={restockQty}
-                onChange={e => setRestockQty(e.target.value)}
-                min="1"
-                autoFocus
-              />
+      {restockItem && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', zIndex: 1060 }}
+          onClick={() => setRestockItem(null)}
+        >
+          <div
+            className="rounded-4 p-4"
+            style={{ background: 'var(--surface-card)', border: '1px solid var(--border-default)', width: '100%', maxWidth: 420, margin: '0 16px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="d-flex align-items-center justify-content-between mb-4">
+              <h3 className="fw-bold mb-0" style={{ fontSize: 17, color: 'var(--text-primary)' }}>
+                Restock: {restockItem.name}
+              </h3>
+              <button
+                className="btn d-flex align-items-center justify-content-center"
+                onClick={() => setRestockItem(null)}
+                style={{ width: 30, height: 30, background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', borderRadius: 8, fontSize: 13, padding: 0 }}
+              >✕</button>
             </div>
-            <div className="form-group">
-              <label className="form-label">Reason (optional)</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g., Weekly delivery"
-                value={restockReason}
-                onChange={e => setRestockReason(e.target.value)}
-              />
+
+            {/* Stats */}
+            <div className="row g-2 mb-4">
+              {[
+                { label: 'Current Stock', value: `${restockItem.stock_quantity} units`, color: stockStatus(restockItem.stock_quantity).color },
+                { label: 'Threshold', value: `≤ ${restockItem.low_stock_threshold ?? LOW_STOCK_THRESHOLD} units`, color: 'var(--text-muted)' },
+              ].map(s => (
+                <div key={s.label} className="col-6">
+                  <div className="rounded-3 p-3" style={{ background: 'var(--surface-2)' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{s.label}</div>
+                    <div className="fw-bold" style={{ fontSize: 15, color: s.color }}>{s.value}</div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className={styles.modalActions}>
-              <button className="btn btn-secondary" onClick={() => setRestockModal(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleRestock} disabled={!restockQty || saving}>
-                {saving ? 'Saving...' : 'Confirm Restock'}
-              </button>
+
+            <div className="d-flex flex-column gap-3">
+              <div>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+                  Add Quantity *
+                </label>
+                <input
+                  type="number" min="1" placeholder="e.g. 50"
+                  className="form-control inv-input"
+                  value={restockQty}
+                  onChange={e => setRestockQty(e.target.value)}
+                  style={{ padding: '10px 14px', fontSize: 14 }}
+                />
+              </div>
+              <div>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+                  Reason (optional)
+                </label>
+                <input
+                  type="text" placeholder="e.g. Weekly delivery"
+                  className="form-control inv-input"
+                  value={restockReason}
+                  onChange={e => setRestockReason(e.target.value)}
+                  style={{ padding: '10px 14px', fontSize: 14 }}
+                />
+              </div>
+
+              {restockQty && parseInt(restockQty) > 0 && (
+                <div className="rounded-3 p-3" style={{ background: 'rgba(6,214,160,0.08)', border: '1px solid rgba(6,214,160,0.2)', fontSize: 13, color: '#06D6A0' }}>
+                  New stock: <strong>{restockItem.stock_quantity + parseInt(restockQty)} units</strong>
+                  {' '}→ Status: <strong>{stockStatus(restockItem.stock_quantity + parseInt(restockQty)).label}</strong>
+                </div>
+              )}
+
+              <div className="d-flex gap-2 mt-2">
+                <button
+                  className="btn fw-semibold flex-fill"
+                  onClick={() => setRestockItem(null)}
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 10 }}
+                >Cancel</button>
+                <button
+                  className="btn fw-bold flex-fill"
+                  onClick={handleRestock}
+                  disabled={saving || !restockQty || parseInt(restockQty) <= 0}
+                  style={{ background: '#06D6A0', color: '#0F1923', border: 'none', borderRadius: 10 }}
+                >
+                  {saving
+                    ? <span className="spinner-border spinner-border-sm" />
+                    : '+ Add Stock'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -1,21 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { menuService } from '../../Services/orderService';
-import styles from './MenuForm.module.css';
 
-export default function MenuForm({ item, categories, onSuccess, onCancel }) {
-  const isEdit = !!item;
+export default function MenuForm({ item, categories, onSaved, onCancel }) {
   const [form, setForm] = useState({
-    name: item?.name || '',
-    category_id: item?.category_id || '',
-    description: item?.description || '',
-    price: item?.price || '',
-    stock_quantity: item?.stock_quantity || 0,
-    low_stock_threshold: item?.low_stock_threshold || 10,
-    preparation_time: item?.preparation_time || 5,
-    is_available: item?.is_available ?? true,
+    name: '',
+    description: '',
+    price: '',
+    category_id: '',
+    stock_quantity: '',
+    is_available: true,
   });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (item) {
+      setForm({
+        name:           item.name || '',
+        description:    item.description || '',
+        price:          item.price || '',
+        category_id:    item.category_id || '',
+        stock_quantity: item.stock_quantity || '',
+        is_available:   item.is_available ?? true,
+      });
+    }
+  }, [item]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -23,101 +32,230 @@ export default function MenuForm({ item, categories, onSuccess, onCancel }) {
     setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
-  const validate = () => {
-    const errs = {};
-    if (!form.name) errs.name = 'Name is required';
-    if (!form.category_id) errs.category_id = 'Category is required';
-    if (!form.price || form.price <= 0) errs.price = 'Valid price is required';
-    return errs;
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-
     setSaving(true);
     try {
-      const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
-
-      if (isEdit) {
-        await menuService.updateItem(item.id, fd);
+      if (item) {
+        await menuService.updateItem(item.id, form);
       } else {
-        await menuService.createItem(fd);
+        await menuService.createItem(form);
       }
-      onSuccess();
+      onSaved();
     } catch (err) {
-      const serverErrors = err.response?.data?.errors || {};
-      setErrors(serverErrors);
+      setErrors(err.response?.data?.errors || {});
     } finally {
       setSaving(false);
     }
   };
 
+  const inputStyle = {
+    background: 'var(--surface-2)',
+    border: '1px solid var(--border-subtle)',
+    color: 'var(--text-primary)',
+    borderRadius: 10,
+    fontSize: 14,
+    padding: '10px 14px',
+  };
+
+  const labelStyle = {
+    fontSize: 12,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    color: 'var(--text-muted)',
+    marginBottom: 6,
+  };
+
   return (
-    <div className={styles.formWrap}>
-      <div className={styles.formHeader}>
-        <button className="btn btn-secondary" onClick={onCancel}>← Back</button>
-        <h2>{isEdit ? 'Edit Menu Item' : 'Add Menu Item'}</h2>
+    <div
+      className="rounded-4 p-4"
+      style={{
+        background: 'var(--surface-card)',
+        border: '1px solid var(--border-default)',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+      }}
+    >
+      {/* Header */}
+      <div className="d-flex align-items-center justify-content-between mb-4">
+        <div>
+          <h3 className="fw-bold mb-1" style={{ fontSize: 18, color: 'var(--text-primary)' }}>
+            {item ? '✏️ Edit Menu Item' : '➕ Add Menu Item'}
+          </h3>
+          <p className="mb-0" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+            {item ? 'Update the details below' : 'Fill in the details below'}
+          </p>
+        </div>
+        <button
+          className="btn d-flex align-items-center justify-content-center rounded-3"
+          onClick={onCancel}
+          style={{
+            width: 32, height: 32,
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border-subtle)',
+            color: 'var(--text-muted)',
+            fontSize: 14,
+          }}
+        >✕</button>
       </div>
 
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.formGrid}>
-          <div className="form-group">
-            <label className="form-label">Item Name *</label>
-            <input name="name" value={form.name} onChange={handleChange} className="form-input" placeholder="e.g., Chicken Adobo" />
-            {errors.name && <span className="form-error">{errors.name}</span>}
+      <form onSubmit={handleSubmit}>
+        <div className="row g-3">
+
+          {/* Name */}
+          <div className="col-12">
+            <label style={labelStyle}>Item Name</label>
+            <input
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              className="form-control"
+              placeholder="e.g. Chicken Adobo"
+              style={inputStyle}
+            />
+            {errors.name && <div style={{ fontSize: 12, color: '#EF476F', marginTop: 4 }}>{errors.name}</div>}
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Category *</label>
-            <select name="category_id" value={form.category_id} onChange={handleChange} className="form-input">
+          {/* Description */}
+          <div className="col-12">
+            <label style={labelStyle}>Description</label>
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              className="form-control"
+              placeholder="Short description of the item..."
+              rows={3}
+              style={{ ...inputStyle, resize: 'vertical' }}
+            />
+          </div>
+
+          {/* Price + Category */}
+          <div className="col-6">
+            <label style={labelStyle}>Price (₱)</label>
+            <input
+              type="number"
+              name="price"
+              value={form.price}
+              onChange={handleChange}
+              className="form-control"
+              placeholder="0.00"
+              min="0"
+              step="0.01"
+              style={inputStyle}
+            />
+            {errors.price && <div style={{ fontSize: 12, color: '#EF476F', marginTop: 4 }}>{errors.price}</div>}
+          </div>
+
+          <div className="col-6">
+            <label style={labelStyle}>Category</label>
+            <select
+              name="category_id"
+              value={form.category_id}
+              onChange={handleChange}
+              className="form-select"
+              style={inputStyle}
+            >
               <option value="">Select category</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+              {categories.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
             </select>
-            {errors.category_id && <span className="form-error">{errors.category_id}</span>}
+            {errors.category_id && <div style={{ fontSize: 12, color: '#EF476F', marginTop: 4 }}>{errors.category_id}</div>}
           </div>
 
-          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">Description</label>
-            <textarea name="description" value={form.description} onChange={handleChange} className="form-input" rows={3} placeholder="Brief description of the item..." style={{ resize: 'vertical' }} />
+          {/* Stock */}
+          <div className="col-6">
+            <label style={labelStyle}>Stock Quantity</label>
+            <input
+              type="number"
+              name="stock_quantity"
+              value={form.stock_quantity}
+              onChange={handleChange}
+              className="form-control"
+              placeholder="0"
+              min="0"
+              style={inputStyle}
+            />
+            {errors.stock_quantity && <div style={{ fontSize: 12, color: '#EF476F', marginTop: 4 }}>{errors.stock_quantity}</div>}
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Price (₱) *</label>
-            <input type="number" name="price" value={form.price} onChange={handleChange} className="form-input" placeholder="0.00" min="0" step="0.01" />
-            {errors.price && <span className="form-error">{errors.price}</span>}
+          {/* Available toggle */}
+          <div className="col-6 d-flex align-items-end">
+            <div
+              className="d-flex align-items-center gap-3 rounded-3 px-3 w-100"
+              style={{
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border-subtle)',
+                height: 44,
+              }}
+            >
+              <div
+                className="position-relative flex-shrink-0"
+                onClick={() => setForm(p => ({ ...p, is_available: !p.is_available }))}
+                style={{ cursor: 'pointer' }}
+              >
+                <div style={{
+                  width: 40, height: 22,
+                  borderRadius: 11,
+                  background: form.is_available ? '#06D6A0' : 'var(--surface-3)',
+                  transition: 'background 0.2s ease',
+                  position: 'relative',
+                }}>
+                  <div style={{
+                    position: 'absolute',
+                    top: 3, left: form.is_available ? 20 : 3,
+                    width: 16, height: 16,
+                    borderRadius: '50%',
+                    background: 'white',
+                    transition: 'left 0.2s ease',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                  }} />
+                </div>
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                {form.is_available ? '✅ Available' : '❌ Unavailable'}
+              </span>
+            </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Stock Quantity</label>
-            <input type="number" name="stock_quantity" value={form.stock_quantity} onChange={handleChange} className="form-input" min="0" />
+          {/* Actions */}
+          <div className="col-12 d-flex gap-2 justify-content-end mt-2">
+            <button
+              type="button"
+              className="btn fw-semibold px-4"
+              onClick={onCancel}
+              style={{
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border-subtle)',
+                color: 'var(--text-secondary)',
+                borderRadius: 10,
+                fontSize: 14,
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn fw-bold px-4"
+              disabled={saving}
+              style={{
+                background: '#FF6B35',
+                color: 'white',
+                border: 'none',
+                borderRadius: 10,
+                fontSize: 14,
+                minWidth: 120,
+              }}
+            >
+              {saving ? (
+                <span className="d-flex align-items-center gap-2 justify-content-center">
+                  <span className="spinner-border spinner-border-sm" />
+                  Saving...
+                </span>
+              ) : item ? 'Update Item' : 'Create Item'}
+            </button>
           </div>
-
-          <div className="form-group">
-            <label className="form-label">Low Stock Threshold</label>
-            <input type="number" name="low_stock_threshold" value={form.low_stock_threshold} onChange={handleChange} className="form-input" min="0" />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Prep Time (minutes)</label>
-            <input type="number" name="preparation_time" value={form.preparation_time} onChange={handleChange} className="form-input" min="1" />
-          </div>
-
-          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-            <label className={styles.checkboxLabel}>
-              <input type="checkbox" name="is_available" checked={form.is_available} onChange={handleChange} className={styles.checkbox} />
-              <span>Item is available for ordering</span>
-            </label>
-          </div>
-        </div>
-
-        <div className={styles.formActions}>
-          <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? 'Saving...' : isEdit ? 'Update Item' : 'Add Item'}
-          </button>
         </div>
       </form>
     </div>

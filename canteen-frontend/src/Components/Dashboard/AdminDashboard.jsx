@@ -4,31 +4,56 @@ import LoadingSpinner from '../Common/LoadingSpinner';
 import SalesChart from './SalesChart';
 import CategoryPieChart from './CategoryPieChart';
 import OrderTrendChart from './OrderTrendChart';
-import styles from './AdminDashboard.module.css';
 
-function StatCard({ title, value, sub, icon, color = 'primary' }) {
-  const colorMap = {
-    primary: 'var(--brand-primary)',
-    success: 'var(--brand-success)',
-    info: 'var(--brand-info)',
-    warning: 'var(--brand-warning)',
+function StatCard({ title, value, sub, icon, color }) {
+  const colors = {
+    primary: { bg: 'rgba(255,107,53,0.12)',  color: '#FF6B35' },
+    success: { bg: 'rgba(6,214,160,0.12)',   color: '#06D6A0' },
+    info:    { bg: 'rgba(17,138,178,0.12)',  color: '#118AB2' },
+    warning: { bg: 'rgba(255,209,102,0.12)', color: '#FFD166' },
   };
+  const c = colors[color] || colors.primary;
 
   return (
-    <div className={styles.statCard}>
-      <div
-        className={styles.statIcon}
-        style={{
-          background: `${colorMap[color]}20`,
-          color: colorMap[color],
-        }}
-      >
-        {icon}
-      </div>
-      <div className={styles.statContent}>
-        <div className={styles.statTitle}>{title}</div>
-        <div className={styles.statValue}>{value}</div>
-        {sub && <div className={styles.statSub}>{sub}</div>}
+    <div
+      className="rounded-3 p-4 h-100"
+      style={{
+        background: 'var(--surface-card)',
+        border: '1px solid var(--border-subtle)',
+      }}
+    >
+      <div className="d-flex align-items-center gap-3">
+        <div
+          className="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0"
+          style={{ width: 48, height: 48, background: c.bg, fontSize: 22 }}
+        >
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div style={{
+            fontSize: 11,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            color: 'var(--text-muted)',
+            marginBottom: 4,
+          }}>
+            {title}
+          </div>
+          <div style={{
+            fontSize: 26,
+            fontWeight: 800,
+            color: 'var(--text-primary)',
+            fontFamily: 'var(--font-display)',
+            lineHeight: 1,
+            marginBottom: 4,
+          }}>
+            {value}
+          </div>
+          {sub && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{sub}</div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -43,12 +68,9 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('daily');
 
-  useEffect(() => {
-    loadDashboard();
-  }, [period]);
+  useEffect(() => { loadDashboard(); }, [period]);
 
   const today = () => new Date().toISOString().split('T')[0];
-
   const getDateFrom = (days) => {
     const d = new Date();
     d.setDate(d.getDate() - days);
@@ -59,44 +81,27 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       const [salesData, catData, trendsResp, lowStockResp] = await Promise.all([
-        reportService.getSalesSummary({
-          period,
-          date_from: getDateFrom(30),
-          date_to: today(),
-        }),
-        reportService.getSalesByCategory({
-          date_from: getDateFrom(30),
-          date_to: today(),
-        }),
+        reportService.getSalesSummary({ period, date_from: getDateFrom(30), date_to: today() }),
+        reportService.getSalesByCategory({ date_from: getDateFrom(30), date_to: today() }),
         reportService.getOrderTrends({ days: 30 }),
         inventoryService.getLowStockAlerts(),
       ]);
 
       setSummary(salesData.summary);
-
-      setRevenueData(
-        salesData.revenue_by_period.map(d => ({
-          period: d.period_label,
-          revenue: parseFloat(d.revenue),
-          orders: d.order_count,
-        }))
-      );
-
-      setCategoryData(
-        catData.map(d => ({
-          name: d.category_name,
-          value: parseFloat(d.total_revenue),
-        }))
-      );
-
-      setTrendsData(
-        trendsResp.map(d => ({
-          date: d.date,
-          orders: d.order_count,
-          revenue: parseFloat(d.revenue),
-        }))
-      );
-
+      setRevenueData(salesData.revenue_by_period.map(d => ({
+        period: d.period_label,
+        revenue: parseFloat(d.revenue),
+        orders: d.order_count,
+      })));
+      setCategoryData(catData.map(d => ({
+        name: d.category_name,
+        value: parseFloat(d.total_revenue),
+      })));
+      setTrendsData(trendsResp.map(d => ({
+        date: d.date,
+        orders: d.order_count,
+        revenue: parseFloat(d.revenue),
+      })));
       setLowStock(lowStockResp.items || []);
     } catch (err) {
       console.error(err);
@@ -105,62 +110,69 @@ export default function AdminDashboard() {
     }
   };
 
-  const fmt = (n) =>
-    `₱${parseFloat(n || 0).toLocaleString('en-PH', {
-      minimumFractionDigits: 2,
-    })}`;
+  const fmt = (n) => `₱${parseFloat(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
 
-  if (loading) {
-    return (
-      <div className={styles.loadingWrap}>
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
+      <LoadingSpinner size="lg" />
+    </div>
+  );
 
   return (
-    <div className={styles.dashboard}>
+    <div className="d-flex flex-column gap-4" style={{ animation: 'fadeIn 0.3s ease' }}>
 
-      {/* Stats Row */}
-      <div className={styles.statsGrid}>
-        <StatCard
-          title="Total Revenue"
-          value={fmt(summary?.total_revenue)}
-          sub="Last 30 days"
-          icon="💰"
-          color="primary"
-        />
-        <StatCard
-          title="Total Orders"
-          value={parseInt(summary?.total_orders || 0).toLocaleString()}
-          sub="Completed orders"
-          icon="📋"
-          color="success"
-        />
-        <StatCard
-          title="Avg Order Value"
-          value={fmt(summary?.average_order_value)}
-          sub="Per transaction"
-          icon="📊"
-          color="info"
-        />
-        <StatCard
-          title="Low Stock Items"
-          value={lowStock.length}
-          sub="Needs restocking"
-          icon="⚠️"
-          color="warning"
-        />
+      {/* Stat Cards */}
+      <div className="row g-3">
+        <div className="col-12 col-sm-6 col-xl-3">
+          <StatCard
+            title="Total Revenue"
+            value={fmt(summary?.total_revenue)}
+            sub="Last 30 days"
+            icon="💰"
+            color="primary"
+          />
+        </div>
+        <div className="col-12 col-sm-6 col-xl-3">
+          <StatCard
+            title="Total Orders"
+            value={parseInt(summary?.total_orders || 0).toLocaleString()}
+            sub="Completed orders"
+            icon="📋"
+            color="success"
+          />
+        </div>
+        <div className="col-12 col-sm-6 col-xl-3">
+          <StatCard
+            title="Avg Order Value"
+            value={fmt(summary?.average_order_value)}
+            sub="Per transaction"
+            icon="📊"
+            color="info"
+          />
+        </div>
+        <div className="col-12 col-sm-6 col-xl-3">
+          <StatCard
+            title="Low Stock Items"
+            value={lowStock.length}
+            sub="Needs restocking"
+            icon="⚠️"
+            color="warning"
+          />
+        </div>
       </div>
 
       {/* Charts Row */}
-      <div className={styles.chartsRow}>
-        <SalesChart
-          data={revenueData}
-          period={period}
-          onPeriodChange={setPeriod}
-        />
-        <CategoryPieChart data={categoryData} />
+      <div className="row g-3">
+        <div className="col-12 col-xl-8">
+          <SalesChart
+            data={revenueData}
+            period={period}
+            onPeriodChange={setPeriod}
+          />
+        </div>
+        <div className="col-12 col-xl-4">
+          <CategoryPieChart data={categoryData} />
+        </div>
       </div>
 
       {/* Order Trend */}
@@ -168,17 +180,33 @@ export default function AdminDashboard() {
 
       {/* Low Stock Alert */}
       {lowStock.length > 0 && (
-        <div className={styles.alertCard}>
-          <div className={styles.alertHeader}>
-            <span>⚠️</span>
-            <h3>Low Stock Alerts ({lowStock.length} items)</h3>
+        <div
+          className="rounded-3 p-4"
+          style={{
+            background: 'rgba(255,209,102,0.06)',
+            border: '1px solid rgba(255,209,102,0.25)',
+          }}
+        >
+          <div className="d-flex align-items-center gap-2 mb-3">
+            <span style={{ fontSize: 22 }}>⚠️</span>
+            <h3 className="mb-0 fw-bold" style={{ fontSize: 15, color: '#FFD166' }}>
+              Low Stock Alerts ({lowStock.length} items)
+            </h3>
           </div>
-          <div className={styles.alertGrid}>
+          <div className="row g-2">
             {lowStock.slice(0, 6).map(item => (
-              <div key={item.id} className={styles.alertItem}>
-                <div className={styles.alertItemName}>{item.name}</div>
-                <div className={styles.alertStock}>
-                  <span className="badge badge-danger">
+              <div key={item.id} className="col-12 col-sm-6 col-md-4">
+                <div
+                  className="d-flex align-items-center justify-content-between rounded-3 px-3 py-2"
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}
+                >
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {item.name}
+                  </span>
+                  <span
+                    className="badge rounded-pill"
+                    style={{ background: 'rgba(239,71,111,0.15)', color: '#EF476F', fontSize: 11 }}
+                  >
                     {item.stock_quantity} left
                   </span>
                 </div>
