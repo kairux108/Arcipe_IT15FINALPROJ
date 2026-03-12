@@ -11,11 +11,12 @@ class MenuItem extends Model
 
     protected $fillable = [
         'category_id', 'name', 'slug', 'description', 'price',
-        'image', 'is_available', 'stock_quantity', 'low_stock_threshold', 'preparation_time',
+        'image', 'image_url', 'is_available', 'stock_quantity',
+        'low_stock_threshold', 'preparation_time',
     ];
 
     protected $casts = [
-        'price' => 'decimal:2',
+        'price'        => 'decimal:2',
         'is_available' => 'boolean',
     ];
 
@@ -51,14 +52,14 @@ class MenuItem extends Model
         $this->refresh();
 
         InventoryLog::create([
-            'menu_item_id' => $this->id,
-            'user_id' => $userId,
-            'type' => 'deduction',
+            'menu_item_id'    => $this->id,
+            'user_id'         => $userId,
+            'type'            => 'deduction',
             'quantity_before' => $before,
             'quantity_change' => -$quantity,
-            'quantity_after' => $this->stock_quantity,
-            'reason' => 'Order deduction',
-            'order_id' => $orderId,
+            'quantity_after'  => $this->stock_quantity,
+            'reason'          => 'Order deduction',
+            'order_id'        => $orderId,
         ]);
 
         if ($this->stock_quantity <= 0) {
@@ -73,13 +74,13 @@ class MenuItem extends Model
         $this->refresh();
 
         InventoryLog::create([
-            'menu_item_id' => $this->id,
-            'user_id' => $userId,
-            'type' => 'restock',
+            'menu_item_id'    => $this->id,
+            'user_id'         => $userId,
+            'type'            => 'restock',
             'quantity_before' => $before,
             'quantity_change' => $quantity,
-            'quantity_after' => $this->stock_quantity,
-            'reason' => $reason,
+            'quantity_after'  => $this->stock_quantity,
+            'reason'          => $reason,
         ]);
 
         if (!$this->is_available && $this->stock_quantity > 0) {

@@ -45,7 +45,7 @@ export default function MenuItemCard({ item, isAdmin, onEdit, onDelete, onToggle
       >
         {item.image_url ? (
           <img
-            src={item.image_url}
+            src={`http://localhost:8000${item.image_url}`}
             alt={item.name}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />

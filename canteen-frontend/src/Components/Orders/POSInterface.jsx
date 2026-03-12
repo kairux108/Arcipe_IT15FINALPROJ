@@ -96,6 +96,7 @@ export default function POSInterface() {
       setReceipt(result.data || result);
       clearCart();
       setAmountPaid('');
+      await loadData();
     } catch (err) {
       setErrorMsg(err.response?.data?.message || 'Order failed. Please try again.');
     } finally { setSubmitting(false); }

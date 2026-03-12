@@ -6,6 +6,7 @@ use App\Models\MenuItem;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class MenuController extends Controller
 {
@@ -17,7 +18,7 @@ class MenuController extends Controller
             $query->where('category_id', $request->category_id);
         }
 
-        if ($request->has('available') && $request->available === 'true') {
+        if ($request->has('available')) {
             $query->where('is_available', true)->where('stock_quantity', '>', 0);
         }
 
@@ -25,8 +26,7 @@ class MenuController extends Controller
             $query->where('name', 'like', '%' . $request->search . '%');
         }
 
-        $perPage = $request->get('per_page', 20);
-        $items = $query->orderBy('name')->paginate($perPage);
+        $items = $query->orderBy('name')->paginate($request->get('per_page', 200));
 
         return response()->json($items);
     }
@@ -46,16 +46,29 @@ class MenuController extends Controller
             'stock_quantity'      => 'nullable|integer|min:0',
             'low_stock_threshold' => 'nullable|integer|min:0',
             'preparation_time'    => 'nullable|integer|min:1',
-            'is_available'        => 'nullable|boolean',
+            'is_available'        => 'nullable',
+            'image'               => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
         ]);
 
-        $validated['slug'] = Str::slug($validated['name']) . '-' . time();
-        $validated['stock_quantity']      = $validated['stock_quantity'] ?? 0;
-        $validated['low_stock_threshold'] = $validated['low_stock_threshold'] ?? 10;
-        $validated['preparation_time']    = $validated['preparation_time'] ?? 5;
-        $validated['is_available']        = $validated['is_available'] ?? true;
+        // Handle image upload
+        $imageUrl = null;
+        if ($request->hasFile('image')) {
+            $path     = $request->file('image')->store('menu-images', 'public');
+            $imageUrl = '/storage/' . $path;
+        }
 
-        $item = MenuItem::create($validated);
+        $item = MenuItem::create([
+            'name'                => $validated['name'],
+            'slug'                => Str::slug($validated['name']) . '-' . time(),
+            'category_id'         => $validated['category_id'],
+            'description'         => $validated['description'] ?? null,
+            'price'               => $validated['price'],
+            'stock_quantity'      => $validated['stock_quantity'] ?? 0,
+            'low_stock_threshold' => $validated['low_stock_threshold'] ?? 10,
+            'preparation_time'    => $validated['preparation_time'] ?? 5,
+            'is_available'        => filter_var($request->input('is_available', true), FILTER_VALIDATE_BOOLEAN),
+            'image_url'           => $imageUrl,
+        ]);
 
         return response()->json([
             'message' => 'Menu item created successfully',
@@ -73,14 +86,42 @@ class MenuController extends Controller
             'stock_quantity'      => 'nullable|integer|min:0',
             'low_stock_threshold' => 'nullable|integer|min:0',
             'preparation_time'    => 'nullable|integer|min:1',
-            'is_available'        => 'nullable|boolean',
+            'is_available'        => 'nullable',
+            'image'               => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+            'remove_image'        => 'nullable',
         ]);
 
-        if (isset($validated['name'])) {
-            $validated['slug'] = Str::slug($validated['name']) . '-' . time();
+        $data = collect($validated)->except(['image', 'remove_image'])->toArray();
+
+        // Handle is_available as string from FormData
+        if ($request->has('is_available')) {
+            $data['is_available'] = filter_var($request->input('is_available'), FILTER_VALIDATE_BOOLEAN);
         }
 
-        $menuItem->update($validated);
+        // Regenerate slug if name changed
+        if (isset($data['name'])) {
+            $data['slug'] = Str::slug($data['name']) . '-' . time();
+        }
+
+        // Remove image
+        if ($request->input('remove_image') == '1' && $menuItem->image_url) {
+            $oldPath = str_replace('/storage/', '', $menuItem->image_url);
+            Storage::disk('public')->delete($oldPath);
+            $data['image_url'] = null;
+        }
+
+        // New image upload
+        if ($request->hasFile('image')) {
+            // Delete old image
+            if ($menuItem->image_url) {
+                $oldPath = str_replace('/storage/', '', $menuItem->image_url);
+                Storage::disk('public')->delete($oldPath);
+            }
+            $path             = $request->file('image')->store('menu-images', 'public');
+            $data['image_url'] = '/storage/' . $path;
+        }
+
+        $menuItem->update($data);
 
         return response()->json([
             'message' => 'Menu item updated successfully',
@@ -90,18 +131,20 @@ class MenuController extends Controller
 
     public function destroy(MenuItem $menuItem): JsonResponse
     {
+        // Clean up image file
+        if ($menuItem->image_url) {
+            $path = str_replace('/storage/', '', $menuItem->image_url);
+            Storage::disk('public')->delete($path);
+        }
+
         $menuItem->delete();
 
-        return response()->json([
-            'message' => 'Menu item deleted successfully',
-        ]);
+        return response()->json(['message' => 'Menu item deleted successfully']);
     }
 
     public function toggleAvailability(MenuItem $menuItem): JsonResponse
     {
-        $menuItem->update([
-            'is_available' => !$menuItem->is_available,
-        ]);
+        $menuItem->update(['is_available' => !$menuItem->is_available]);
 
         return response()->json([
             'message'      => 'Availability updated',
