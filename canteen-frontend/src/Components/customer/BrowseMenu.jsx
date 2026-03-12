@@ -481,7 +481,7 @@ export default function BrowseMenu() {
                     <div className="d-flex align-items-center justify-content-center"
                       style={{ height: 120, background: 'var(--surface-2)', position: 'relative' }}>
                       {item.image_url
-                        ? <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ? <img src={`http://localhost:8000${item.image_url}`} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         : <span style={{ fontSize: 40 }}>🍽️</span>
                       }
                       {inCart && (

@@ -53,15 +53,16 @@ class InventoryController extends Controller
                 $menuItem->update(['is_available' => true]);
             }
 
-            InventoryLog::create([
-                'menu_item_id' => $menuItem->id,
-                'user_id'      => $request->user()->id,
-                'type'         => 'restock',
-                'quantity'     => $validated['quantity'],
-                'reason'       => $validated['reason'] ?? 'Manual restock',
-                'stock_before' => $before,
-                'stock_after'  => $after,
-            ]);
+          InventoryLog::create([
+    'menu_item_id'    => $menuItem->id,
+    'user_id'         => $request->user()->id,
+    'type'            => 'restock',
+    'quantity'        => $validated['quantity'],  // keep this too
+    'quantity_change' => $validated['quantity'],  // ✅ add this
+    'reason'          => $validated['reason'] ?? 'Manual restock',
+    'quantity_before' => $before,
+    'quantity_after'  => $after,
+]);
 
             return response()->json([
                 'message'      => 'Restocked successfully',
@@ -94,15 +95,16 @@ class InventoryController extends Controller
                     $menuItem->update(['is_available' => true]);
                 }
 
-                InventoryLog::create([
-                    'menu_item_id' => $menuItem->id,
-                    'user_id'      => $request->user()->id,
-                    'type'         => 'restock',
-                    'quantity'     => $item['quantity'],
-                    'reason'       => $validated['reason'] ?? 'Bulk restock',
-                    'stock_before' => $before,
-                    'stock_after'  => $after,
-                ]);
+               InventoryLog::create([
+    'menu_item_id'    => $menuItem->id,
+    'user_id'         => $request->user()->id,
+    'type'            => 'restock',
+    'quantity'        => $item['quantity'],
+    'quantity_change' => $item['quantity'],  // ✅ add this
+    'reason'          => $validated['reason'] ?? 'Bulk restock',
+    'quantity_before' => $before,
+    'quantity_after'  => $after,
+]);
 
                 $results[] = ['id' => $menuItem->id, 'name' => $menuItem->name, 'stock_after' => $after];
             }
@@ -133,14 +135,15 @@ class InventoryController extends Controller
             $after = $menuItem->fresh()->stock_quantity;
 
             InventoryLog::create([
-                'menu_item_id' => $menuItem->id,
-                'user_id'      => $request->user()->id,
-                'type'         => 'adjust',
-                'quantity'     => $validated['quantity'],
-                'reason'       => $validated['reason'] ?? 'Manual adjustment',
-                'stock_before' => $before,
-                'stock_after'  => $after,
-            ]);
+    'menu_item_id'    => $menuItem->id,
+    'user_id'         => $request->user()->id,
+    'type'            => 'adjust',
+    'quantity'        => $validated['quantity'],
+    'quantity_change' => $validated['type'] === 'add' ? $validated['quantity'] : -$validated['quantity'],  // ✅ negative for subtract
+    'reason'          => $validated['reason'] ?? 'Manual adjustment',
+    'quantity_before' => $before,
+    'quantity_after'  => $after,
+]);
 
             return response()->json([
                 'message'   => 'Stock adjusted',

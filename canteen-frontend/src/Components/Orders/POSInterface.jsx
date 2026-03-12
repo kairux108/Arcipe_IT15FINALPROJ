@@ -265,7 +265,7 @@ export default function POSInterface() {
                         <div className="d-flex align-items-center justify-content-center rounded-3 mb-2"
                           style={{ height: 64, background: 'var(--surface-2)', fontSize: 28 }}>
                           {item.image_url
-                            ? <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} />
+                            ? <img src={`http://localhost:8000${item.image_url}`} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} />
                             : '🍽️'}
                         </div>
 

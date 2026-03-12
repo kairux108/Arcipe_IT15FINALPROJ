@@ -1,59 +1,283 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 🍽️ Inventopia — Canteen Management System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A full-stack Canteen Management System built with **React.js** (frontend) and **Laravel** (backend) for IT15/L Integrative Programming Final Project.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 🚀 Features
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### 👤 Role-Based Access
+| Role | Access |
+|------|--------|
+| **Admin** | Full access — dashboard, menu, orders, inventory, reports, user management |
+| **Cashier** | POS interface, order queue, basic inventory view |
+| **Customer** | Browse menu, place orders, track order status |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### 📋 Modules
+- **Authentication** — Secure login with Laravel Sanctum, protected routes, session management
+- **Menu Management** — CRUD for menu items with image upload, category filter, availability toggle
+- **Order Processing** — POS interface with cash/card/e-wallet, order queue with status flow, customer order tracking
+- **Inventory Management** — Real-time stock tracking, low-stock alerts, restock, inventory log
+- **Sales Reports** — Bar/Pie/Line charts (Recharts), date range filter, CSV export
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## 🛠️ Technology Stack
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| Frontend | React.js | 18.x |
+| Build Tool | Vite | 5.x |
+| UI Framework | Bootstrap | 5.3.3 |
+| Charts | Recharts | 2.x |
+| Backend | Laravel | 11.x |
+| Authentication | Laravel Sanctum | 4.x |
+| Database | MySQL | 8.x |
+| HTTP Client | Axios | 1.x |
 
-## Laravel Sponsors
+---
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## 📁 Project Structure
 
-### Premium Partners
+```
+├── canteen-backend/          # Laravel API
+│   ├── app/
+│   │   ├── Models/
+│   │   │   ├── User.php
+│   │   │   ├── MenuItem.php
+│   │   │   ├── Category.php
+│   │   │   ├── Order.php
+│   │   │   ├── OrderItem.php
+│   │   │   └── InventoryLog.php
+│   │   └── Http/
+│   │       ├── Controllers/
+│   │       │   ├── AuthController.php
+│   │       │   ├── MenuController.php
+│   │       │   ├── OrderController.php
+│   │       │   ├── InventoryController.php
+│   │       │   ├── ReportController.php
+│   │       │   └── UserController.php
+│   │       └── Middleware/
+│   │           └── RoleMiddleware.php
+│   ├── database/
+│   │   ├── migrations/
+│   │   └── seeders/
+│   │       └── DatabaseSeeder.php
+│   └── routes/api.php
+│
+└── canteen-frontend/         # React App
+    └── src/
+        ├── Components/
+        │   ├── Auth/          Login.jsx, ProtectedRoute.jsx
+        │   ├── Dashboard/     AdminDashboard.jsx, SalesChart.jsx, CategoryPieChart.jsx, OrderTrendChart.jsx
+        │   ├── Menu/          MenuList.jsx, MenuItemCard.jsx, MenuForm.jsx
+        │   ├── Orders/        POSInterface.jsx, OrderQueue.jsx, OrderReceipt.jsx
+        │   ├── Inventory/     InventoryTable.jsx, InventoryLogPage.jsx, LowStockAlert.jsx
+        │   ├── user/          UserManagement.jsx
+        │   ├── customer/      BrowseMenu.jsx, MyOrders.jsx
+        │   ├── reports/       SalesReport.jsx
+        │   └── Common/        Sidebar.jsx, Navbar.jsx, LoadingSpinner.jsx, ErrorBoundary.jsx
+        ├── Context/           AuthContext.jsx, CartContext.jsx, ThemeContext.jsx
+        ├── Services/          api.js, authService.js, orderService.js
+        ├── layouts/           AppLayout.jsx
+        └── App.jsx
+```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+---
 
-## Contributing
+## ⚙️ Setup & Installation
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Prerequisites
+- PHP 8.2+
+- Composer
+- Node.js 18+
+- MySQL 8.x
 
-## Code of Conduct
+---
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Backend Setup (Laravel)
 
-## Security Vulnerabilities
+```bash
+cd canteen-backend
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+# Install dependencies
+composer install
 
-## License
+# Copy environment file
+cp .env.example .env
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# Generate application key
+php artisan key:generate
+
+# Configure your database in .env
+# DB_DATABASE=canteen_db
+# DB_USERNAME=root
+# DB_PASSWORD=
+
+# Run migrations and seed dummy data
+php artisan migrate --seed
+
+# Create storage symlink for image uploads
+php artisan storage:link
+
+# Start the development server
+php artisan serve
+```
+
+Backend runs at: `http://localhost:8000`
+
+---
+
+### Frontend Setup (React)
+
+```bash
+cd canteen-frontend
+
+# Install dependencies
+npm install
+
+# Copy environment file
+cp .env.example .env
+
+# Start the development server
+npm run dev
+```
+
+Frontend runs at: `http://localhost:3000`
+
+---
+
+## 🔑 Demo Accounts
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@canteen.com | password |
+| Cashier | cashier@canteen.com | password |
+| Customer | customer@canteen.com | password |
+
+---
+
+## 🌐 API Endpoints
+
+### Authentication
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/login` | Login and get token |
+| POST | `/api/logout` | Logout |
+| GET | `/api/user` | Get authenticated user |
+
+### Menu
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/menu` | List menu items (filterable) |
+| POST | `/api/menu` | Create menu item (with image) |
+| GET | `/api/menu/{id}` | Get single item |
+| PUT | `/api/menu/{id}` | Update menu item |
+| DELETE | `/api/menu/{id}` | Delete menu item |
+| PATCH | `/api/menu/{id}/toggle` | Toggle availability |
+| GET | `/api/categories` | List categories |
+
+### Orders
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/orders` | List all orders (admin/cashier) |
+| POST | `/api/orders` | Create new order |
+| GET | `/api/orders/{id}` | Get single order |
+| PATCH | `/api/orders/{id}/status` | Update order status |
+| GET | `/api/orders/my` | Customer's own orders |
+
+### Inventory
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/inventory` | List all inventory |
+| GET | `/api/inventory/low-stock` | Low stock alerts |
+| POST | `/api/inventory/{id}/restock` | Restock item |
+| POST | `/api/inventory/bulk-restock` | Bulk restock |
+| POST | `/api/inventory/{id}/adjust` | Manual adjustment |
+| GET | `/api/inventory/logs` | Inventory change log |
+
+### Reports
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/reports/sales-summary` | Sales totals by period |
+| GET | `/api/reports/best-sellers` | Top items by qty/revenue |
+| GET | `/api/reports/order-trends` | Order volume over time |
+| GET | `/api/reports/sales-by-category` | Category breakdown |
+| GET | `/api/reports/export-csv` | Export to CSV |
+
+### Users (Admin only)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/users` | List all users |
+| POST | `/api/users` | Create user |
+| PUT | `/api/users/{id}` | Update user |
+| DELETE | `/api/users/{id}` | Delete user |
+
+---
+
+## 🗄️ Database Schema
+
+### Tables
+- **users** — id, name, email, password, role (admin/cashier/customer)
+- **categories** — id, name, slug, description
+- **menu_items** — id, category_id, name, slug, description, price, image_url, is_available, stock_quantity, low_stock_threshold, preparation_time
+- **orders** — id, user_id, order_number, status, payment_method, subtotal, tax, total, amount_paid, change_given, notes
+- **order_items** — id, order_id, menu_item_id, item_name, unit_price, quantity, subtotal
+- **inventory_logs** — id, menu_item_id, user_id, order_id, type, quantity_before, quantity_change, quantity_after, reason
+
+### Order Status Flow
+```
+pending → preparing → ready → completed
+                    ↘ cancelled
+```
+
+---
+
+## 🌱 Seeded Data
+- 3 users (admin, cashier, customer)
+- 5 categories (Meals, Snacks, Beverages, Desserts, Combos)
+- 33 menu items with stock quantities
+- 220+ orders with order items
+
+---
+
+## 🔒 Security
+- Laravel Sanctum for API token authentication
+- Role-based middleware protecting all API routes
+- CORS configured for frontend origin
+- Environment variables for all sensitive credentials
+- Input validation on all API endpoints
+
+---
+
+## 📦 Environment Variables
+
+### Backend (`canteen-backend/.env`)
+```env
+APP_NAME=Inventopia
+APP_URL=http://localhost:8000
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=canteen_db
+DB_USERNAME=root
+DB_PASSWORD=
+
+SANCTUM_STATEFUL_DOMAINS=localhost:3000
+SESSION_DRIVER=cookie
+FRONTEND_URL=http://localhost:3000
+```
+
+### Frontend (`canteen-frontend/.env`)
+```env
+VITE_API_URL=http://localhost:8000/api
+```
+
+---
+
+## 👨‍💻 Developer
+
+**Justin Arcipe**
+IT15/L — Integrative Programming
+Final Project — Canteen Management System
