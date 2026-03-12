@@ -17,10 +17,7 @@ function StatCard({ title, value, sub, icon, color }) {
   return (
     <div
       className="rounded-3 p-4 h-100"
-      style={{
-        background: 'var(--surface-card)',
-        border: '1px solid var(--border-subtle)',
-      }}
+      style={{ background: 'var(--surface-card)', border: '1px solid var(--border-subtle)' }}
     >
       <div className="d-flex align-items-center gap-3">
         <div
@@ -29,7 +26,7 @@ function StatCard({ title, value, sub, icon, color }) {
         >
           {icon}
         </div>
-        <div className="min-w-0">
+        <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{
             fontSize: 11,
             fontWeight: 700,
@@ -40,13 +37,16 @@ function StatCard({ title, value, sub, icon, color }) {
           }}>
             {title}
           </div>
+          {/* ✅ FIX: clamp so long values like ₱31,208.80 never overflow */}
           <div style={{
-            fontSize: 26,
+            fontSize: 'clamp(15px, 1.6vw, 26px)',
             fontWeight: 800,
             color: 'var(--text-primary)',
             fontFamily: 'var(--font-display)',
-            lineHeight: 1,
+            lineHeight: 1.1,
             marginBottom: 4,
+            wordBreak: 'break-word',
+            overflow: 'hidden',
           }}>
             {value}
           </div>
@@ -60,13 +60,13 @@ function StatCard({ title, value, sub, icon, color }) {
 }
 
 export default function AdminDashboard() {
-  const [summary, setSummary] = useState(null);
+  const [summary, setSummary]         = useState(null);
   const [revenueData, setRevenueData] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
-  const [trendsData, setTrendsData] = useState([]);
-  const [lowStock, setLowStock] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState('daily');
+  const [trendsData, setTrendsData]   = useState([]);
+  const [lowStock, setLowStock]       = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [period, setPeriod]           = useState('daily');
 
   useEffect(() => { loadDashboard(); }, [period]);
 
@@ -124,51 +124,23 @@ export default function AdminDashboard() {
       {/* Stat Cards */}
       <div className="row g-3">
         <div className="col-12 col-sm-6 col-xl-3">
-          <StatCard
-            title="Total Revenue"
-            value={fmt(summary?.total_revenue)}
-            sub="Last 30 days"
-            icon="💰"
-            color="primary"
-          />
+          <StatCard title="Total Revenue"    value={fmt(summary?.total_revenue)}                        sub="Last 30 days"      icon="💰" color="primary" />
         </div>
         <div className="col-12 col-sm-6 col-xl-3">
-          <StatCard
-            title="Total Orders"
-            value={parseInt(summary?.total_orders || 0).toLocaleString()}
-            sub="Completed orders"
-            icon="📋"
-            color="success"
-          />
+          <StatCard title="Total Orders"     value={parseInt(summary?.total_orders || 0).toLocaleString()} sub="Completed orders"  icon="📋" color="success" />
         </div>
         <div className="col-12 col-sm-6 col-xl-3">
-          <StatCard
-            title="Avg Order Value"
-            value={fmt(summary?.average_order_value)}
-            sub="Per transaction"
-            icon="📊"
-            color="info"
-          />
+          <StatCard title="Avg Order Value"  value={fmt(summary?.average_order_value)}                  sub="Per transaction"   icon="📊" color="info"    />
         </div>
         <div className="col-12 col-sm-6 col-xl-3">
-          <StatCard
-            title="Low Stock Items"
-            value={lowStock.length}
-            sub="Needs restocking"
-            icon="⚠️"
-            color="warning"
-          />
+          <StatCard title="Low Stock Items"  value={lowStock.length}                                    sub="Needs restocking"  icon="⚠️" color="warning" />
         </div>
       </div>
 
       {/* Charts Row */}
       <div className="row g-3">
         <div className="col-12 col-xl-8">
-          <SalesChart
-            data={revenueData}
-            period={period}
-            onPeriodChange={setPeriod}
-          />
+          <SalesChart data={revenueData} period={period} onPeriodChange={setPeriod} />
         </div>
         <div className="col-12 col-xl-4">
           <CategoryPieChart data={categoryData} />
@@ -182,10 +154,7 @@ export default function AdminDashboard() {
       {lowStock.length > 0 && (
         <div
           className="rounded-3 p-4"
-          style={{
-            background: 'rgba(255,209,102,0.06)',
-            border: '1px solid rgba(255,209,102,0.25)',
-          }}
+          style={{ background: 'rgba(255,209,102,0.06)', border: '1px solid rgba(255,209,102,0.25)' }}
         >
           <div className="d-flex align-items-center gap-2 mb-3">
             <span style={{ fontSize: 22 }}>⚠️</span>

@@ -175,7 +175,9 @@ export default function SalesReport() {
                           </span>
                         </td>
                         <td>
-                          <span className="fw-semibold" style={{ fontSize: 13 }}>{item.name}</span>
+                          <span className="fw-semibold" style={{ fontSize: 13 }}>
+                            {item.name ?? item.item_name ?? item.menu_item_name ?? item.product_name ?? '—'}
+                          </span>
                         </td>
                         <td>
                           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{item.category_name}</span>
