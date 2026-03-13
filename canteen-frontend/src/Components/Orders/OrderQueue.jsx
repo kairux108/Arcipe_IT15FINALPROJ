@@ -31,7 +31,7 @@ export default function OrderQueue() {
   const load = useCallback(async () => {
     try {
       // Always use getOrders with no status filter so ALL statuses come back
-      const data = await orderService.getOrders({ per_page: 200 });
+      const data = await orderService.getOrders({ per_page: 1000 });
       const raw  = data?.data ?? data ?? [];
       const list = Array.isArray(raw) ? raw : [];
       setOrders(list);
