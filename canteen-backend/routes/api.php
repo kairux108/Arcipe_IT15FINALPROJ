@@ -61,9 +61,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Users (admin only)
     Route::middleware('role:admin')->group(function () {
-        Route::get('/users',          [UserController::class, 'index']);
-        Route::post('/users',         [UserController::class, 'store']);
-        Route::put('/users/{user}',   [UserController::class, 'update']);
-        Route::delete('/users/{user}',[UserController::class, 'destroy']);
+        Route::get('/users',                        [UserController::class, 'index']);
+        Route::post('/users',                       [UserController::class, 'store']);
+        Route::put('/users/{user}',                 [UserController::class, 'update']);
+        Route::delete('/users/{user}',              [UserController::class, 'destroy']);
+        Route::patch('/users/{user}/toggle-active', [UserController::class, 'toggleActive']); // ✅ ADDED
     });
 });
