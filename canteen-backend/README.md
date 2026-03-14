@@ -276,8 +276,11 @@ VITE_API_URL=http://localhost:8000/api
 
 ---
 
-## 👨‍💻 Developer
+## 👨‍💻 Developers
 
-**Justin Arcipe**
+**Justine Kylle B. Arcipe**
+**Justine Kylle B. Arcipe**
+**Justine Kylle B. Arcipe**
+**Justine Kylle B. Arcipe**
 IT15/L — Integrative Programming
 Final Project — Canteen Management System

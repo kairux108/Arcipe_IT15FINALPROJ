@@ -12,11 +12,12 @@ return new class extends Migration
             $table->id();
             $table->foreignId('menu_item_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
-            $table->enum('type', ['restock', 'deduct', 'adjust']);
-            $table->integer('quantity');
+            $table->enum('type', ['restock', 'deduction', 'adjustment', 'waste']);
+            $table->integer('quantity_before')->default(0);
+            $table->integer('quantity_change');
+            $table->integer('quantity_after')->default(0);
             $table->string('reason')->nullable();
-            $table->integer('stock_before')->default(0);
-            $table->integer('stock_after')->default(0);
+            $table->foreignId('order_id')->nullable()->constrained()->onDelete('set null');
             $table->timestamps();
         });
     }
