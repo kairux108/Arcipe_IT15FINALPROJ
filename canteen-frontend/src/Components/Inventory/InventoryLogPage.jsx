@@ -70,7 +70,7 @@ export default function InventoryLogPage() {
         <div>
           <h2 className="fw-bold mb-1" style={{ fontSize: 20, color: 'var(--text-primary)' }}>Inventory Log</h2>
           <p className="mb-0" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-            Stock change history — restocks, deductions, and adjustments
+            Stock change history — restocks, deductions, adjustments, and waste
           </p>
         </div>
         <div className="d-flex gap-2">
@@ -157,7 +157,7 @@ export default function InventoryLogPage() {
               <tbody>
                 {filtered.map(log => {
                   const s      = TYPE_STYLES[log.type] ?? TYPE_STYLES.adjustment;
-                  const change = log.quantity_change ?? log.quantity ?? 0;
+                  const change = parseInt(log.quantity_change ?? log.quantity ?? 0);
                   const before = log.quantity_before ?? log.stock_before ?? '—';
                   const after  = log.quantity_after  ?? log.stock_after  ?? '—';
                   return (
@@ -177,9 +177,13 @@ export default function InventoryLogPage() {
                         </span>
                       </td>
                       <td style={{ fontSize: 13, color: 'var(--text-muted)' }}>{before}</td>
+                      {/* ✅ FIX: Use actual sign of quantity_change */}
                       <td>
-                        <span className="fw-bold" style={{ color: log.type === 'deduction' ? '#EF476F' : '#06D6A0', fontSize: 14 }}>
-                          {log.type === 'deduction' ? '−' : '+'}{change}
+                        <span className="fw-bold" style={{
+                          color: change < 0 ? '#EF476F' : '#06D6A0',
+                          fontSize: 14,
+                        }}>
+                          {change > 0 ? `+${change}` : change}
                         </span>
                       </td>
                       <td>
