@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\MenuItem;
+use App\Models\InventoryLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 
 class MenuController extends Controller
 {
@@ -50,7 +52,6 @@ class MenuController extends Controller
             'image'               => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
         ]);
 
-        // Handle image upload
         $imageUrl = null;
         if ($request->hasFile('image')) {
             $path     = $request->file('image')->store('menu-images', 'public');
@@ -69,6 +70,19 @@ class MenuController extends Controller
             'is_available'        => filter_var($request->input('is_available', true), FILTER_VALIDATE_BOOLEAN),
             'image_url'           => $imageUrl,
         ]);
+
+        // Log initial stock if stock_quantity > 0
+        if (($validated['stock_quantity'] ?? 0) > 0) {
+            InventoryLog::create([
+                'menu_item_id'    => $item->id,
+                'user_id'         => Auth::id(),
+                'type'            => 'restock',
+                'quantity_before' => 0,
+                'quantity_change' => $item->stock_quantity,
+                'quantity_after'  => $item->stock_quantity,
+                'reason'          => 'Initial stock',
+            ]);
+        }
 
         return response()->json([
             'message' => 'Menu item created successfully',
@@ -93,32 +107,44 @@ class MenuController extends Controller
 
         $data = collect($validated)->except(['image', 'remove_image'])->toArray();
 
-        // Handle is_available as string from FormData
         if ($request->has('is_available')) {
             $data['is_available'] = filter_var($request->input('is_available'), FILTER_VALIDATE_BOOLEAN);
         }
 
-        // Regenerate slug if name changed
         if (isset($data['name'])) {
             $data['slug'] = Str::slug($data['name']) . '-' . time();
         }
 
-        // Remove image
         if ($request->input('remove_image') == '1' && $menuItem->image_url) {
             $oldPath = str_replace('/storage/', '', $menuItem->image_url);
             Storage::disk('public')->delete($oldPath);
             $data['image_url'] = null;
         }
 
-        // New image upload
         if ($request->hasFile('image')) {
-            // Delete old image
             if ($menuItem->image_url) {
                 $oldPath = str_replace('/storage/', '', $menuItem->image_url);
                 Storage::disk('public')->delete($oldPath);
             }
-            $path             = $request->file('image')->store('menu-images', 'public');
+            $path              = $request->file('image')->store('menu-images', 'public');
             $data['image_url'] = '/storage/' . $path;
+        }
+
+        // ✅ Log stock adjustment if stock_quantity changed
+        if (isset($data['stock_quantity']) && (int)$data['stock_quantity'] !== (int)$menuItem->stock_quantity) {
+            $before = (int) $menuItem->stock_quantity;
+            $after  = (int) $data['stock_quantity'];
+            $change = $after - $before;
+
+            InventoryLog::create([
+                'menu_item_id'    => $menuItem->id,
+                'user_id'         => Auth::id(),
+                'type'            => 'adjustment',
+                'quantity_before' => $before,
+                'quantity_change' => $change,
+                'quantity_after'  => $after,
+                'reason'          => 'Manual adjustment via menu edit',
+            ]);
         }
 
         $menuItem->update($data);
@@ -131,7 +157,6 @@ class MenuController extends Controller
 
     public function destroy(MenuItem $menuItem): JsonResponse
     {
-        // Clean up image file
         if ($menuItem->image_url) {
             $path = str_replace('/storage/', '', $menuItem->image_url);
             Storage::disk('public')->delete($path);

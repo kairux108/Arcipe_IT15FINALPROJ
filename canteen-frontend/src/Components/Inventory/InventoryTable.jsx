@@ -33,10 +33,18 @@ export default function InventoryTable() {
   const [inventory, setInventory]         = useState([]);
   const [loading, setLoading]             = useState(true);
   const [search, setSearch]               = useState('');
+
+  // Restock state
   const [restockItem, setRestockItem]     = useState(null);
   const [restockQty, setRestockQty]       = useState('');
   const [restockReason, setRestockReason] = useState('');
   const [saving, setSaving]               = useState(false);
+
+  // ✅ Waste state
+  const [wasteItem, setWasteItem]         = useState(null);
+  const [wasteQty, setWasteQty]           = useState('');
+  const [wasteReason, setWasteReason]     = useState('');
+  const [wasteSaving, setWasteSaving]     = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -68,6 +76,29 @@ export default function InventoryTable() {
     }
   };
 
+  // ✅ Waste handler
+  const handleWaste = async () => {
+    if (!wasteQty || parseInt(wasteQty) <= 0) return;
+    if (parseInt(wasteQty) > wasteItem.stock_quantity) return;
+    setWasteSaving(true);
+    try {
+      await inventoryService.adjustStock(
+        wasteItem.id,
+        parseInt(wasteQty),
+        'waste',
+        wasteReason || 'Waste reported'
+      );
+      setWasteItem(null);
+      setWasteQty('');
+      setWasteReason('');
+      await load();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setWasteSaving(false);
+    }
+  };
+
   const filtered = (inventory || []).filter(i =>
     (i.name || '').toLowerCase().includes(search.toLowerCase())
   );
@@ -93,7 +124,6 @@ export default function InventoryTable() {
             </p>
           </div>
           <div className="d-flex gap-2">
-            {/* View Log button */}
             <button
               className="btn fw-semibold"
               onClick={() => navigate(`/${role}/inventory/log`)}
@@ -130,7 +160,7 @@ export default function InventoryTable() {
               <table className="table mb-0 inv-table">
                 <thead>
                   <tr>
-                    {['Item', 'Category', 'Price', 'Stock', 'Threshold', 'Status', 'Action'].map(h => (
+                    {['Item', 'Category', 'Price', 'Stock', 'Threshold', 'Status', 'Actions'].map(h => (
                       <th key={h}>{h}</th>
                     ))}
                   </tr>
@@ -162,13 +192,23 @@ export default function InventoryTable() {
                           </span>
                         </td>
                         <td>
-                          <button
-                            className="btn btn-sm fw-semibold"
-                            onClick={() => { setRestockItem(item); setRestockQty(''); setRestockReason(''); }}
-                            style={{ background: 'rgba(6,214,160,0.1)', border: '1px solid rgba(6,214,160,0.3)', color: '#06D6A0', borderRadius: 8, fontSize: 12, padding: '5px 14px' }}
-                          >
-                            + Restock
-                          </button>
+                          <div className="d-flex gap-2">
+                            <button
+                              className="btn btn-sm fw-semibold"
+                              onClick={() => { setRestockItem(item); setRestockQty(''); setRestockReason(''); }}
+                              style={{ background: 'rgba(6,214,160,0.1)', border: '1px solid rgba(6,214,160,0.3)', color: '#06D6A0', borderRadius: 8, fontSize: 12, padding: '5px 14px' }}
+                            >
+                              + Restock
+                            </button>
+                            {/* ✅ Waste button */}
+                            <button
+                              className="btn btn-sm fw-semibold"
+                              onClick={() => { setWasteItem(item); setWasteQty(''); setWasteReason(''); }}
+                              style={{ background: 'rgba(239,71,111,0.1)', border: '1px solid rgba(239,71,111,0.3)', color: '#EF476F', borderRadius: 8, fontSize: 12, padding: '5px 14px' }}
+                            >
+                              🗑 Waste
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -261,6 +301,99 @@ export default function InventoryTable() {
                   disabled={saving || !restockQty || parseInt(restockQty) <= 0}
                   style={{ background: '#06D6A0', color: '#0F1923', border: 'none', borderRadius: 10 }}>
                   {saving ? <span className="spinner-border spinner-border-sm" /> : '+ Add Stock'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Waste Modal */}
+      {wasteItem && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', zIndex: 1060 }}
+          onClick={() => setWasteItem(null)}
+        >
+          <div
+            className="rounded-4 p-4"
+            style={{ background: 'var(--surface-card)', border: '1px solid var(--border-default)', width: '100%', maxWidth: 420, margin: '0 16px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="d-flex align-items-center justify-content-between mb-4">
+              <h3 className="fw-bold mb-0" style={{ fontSize: 17, color: 'var(--text-primary)' }}>
+                🗑 Report Waste: {wasteItem.name}
+              </h3>
+              <button
+                className="btn d-flex align-items-center justify-content-center"
+                onClick={() => setWasteItem(null)}
+                style={{ width: 30, height: 30, background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', borderRadius: 8, fontSize: 13, padding: 0 }}
+              >✕</button>
+            </div>
+
+            <div className="row g-2 mb-4">
+              {[
+                { label: 'Current Stock', value: `${wasteItem.stock_quantity} units`, color: stockStatus(wasteItem.stock_quantity).color },
+                { label: 'After Waste',   value: wasteQty && parseInt(wasteQty) > 0 ? `${wasteItem.stock_quantity - parseInt(wasteQty)} units` : '— units', color: 'var(--text-muted)' },
+              ].map(s => (
+                <div key={s.label} className="col-6">
+                  <div className="rounded-3 p-3" style={{ background: 'var(--surface-2)' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{s.label}</div>
+                    <div className="fw-bold" style={{ fontSize: 15, color: s.color }}>{s.value}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="d-flex flex-column gap-3">
+              <div>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+                  Waste Quantity *
+                </label>
+                <input
+                  type="number" min="1" max={wasteItem.stock_quantity} placeholder="e.g. 5"
+                  className="form-control inv-input"
+                  value={wasteQty}
+                  onChange={e => setWasteQty(e.target.value)}
+                  style={{ padding: '10px 14px', fontSize: 14 }}
+                />
+                {wasteQty && parseInt(wasteQty) > wasteItem.stock_quantity && (
+                  <div style={{ fontSize: 12, color: '#EF476F', marginTop: 4 }}>
+                    ⚠️ Cannot exceed current stock ({wasteItem.stock_quantity} units)
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+                  Reason (optional)
+                </label>
+                <input
+                  type="text" placeholder="e.g. Expired, Damaged, Spoiled"
+                  className="form-control inv-input"
+                  value={wasteReason}
+                  onChange={e => setWasteReason(e.target.value)}
+                  style={{ padding: '10px 14px', fontSize: 14 }}
+                />
+              </div>
+
+              {wasteQty && parseInt(wasteQty) > 0 && parseInt(wasteQty) <= wasteItem.stock_quantity && (
+                <div className="rounded-3 p-3" style={{ background: 'rgba(239,71,111,0.08)', border: '1px solid rgba(239,71,111,0.2)', fontSize: 13, color: '#EF476F' }}>
+                  Stock after waste: <strong>{wasteItem.stock_quantity - parseInt(wasteQty)} units</strong>
+                  {' '}→ Status: <strong>{stockStatus(wasteItem.stock_quantity - parseInt(wasteQty)).label}</strong>
+                </div>
+              )}
+
+              <div className="d-flex gap-2 mt-2">
+                <button className="btn fw-semibold flex-fill"
+                  onClick={() => setWasteItem(null)}
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 10 }}>
+                  Cancel
+                </button>
+                <button className="btn fw-bold flex-fill"
+                  onClick={handleWaste}
+                  disabled={wasteSaving || !wasteQty || parseInt(wasteQty) <= 0 || parseInt(wasteQty) > wasteItem.stock_quantity}
+                  style={{ background: '#EF476F', color: 'white', border: 'none', borderRadius: 10 }}>
+                  {wasteSaving ? <span className="spinner-border spinner-border-sm" /> : '🗑 Report Waste'}
                 </button>
               </div>
             </div>
